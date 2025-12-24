@@ -1,0 +1,664 @@
+---
+title: "Analyse Complète des Concentrations de CO₂ Globales"
+subtitle: "Données NOAA (1979-2025)"
+author: "Mazzez Mohamed Amine"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    theme: flatly
+    highlight: tango
+    code_folding: show
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 8,
+  fig.align = "center",
+  dpi = 300
+)
+
+# Paramètres visuels
+options(scipen = 999)
+```
+
+---
+
+# Introduction 
+
+## Contexte et Objectifs 
+
+Le dioxyde de carbone (CO₂) est l'un des gaz à effet de serre les plus importants. Sa concentration atmosphérique a augmenté de manière significative depuis l'ère industrielle. Ce rapport analyse les données globales de concentrations de CO₂ collectées par le **NOAA Global Monitoring Laboratory** de 1979 à 2025.
+
+### Objectifs de l'analyse:
+- Étudier l'évolution temporelle des concentrations de CO₂
+- Analyser les tendances et les taux de croissance
+- Examiner la saisonnalité et ses variations
+- Fournir des statistiques descriptives complètes
+
+---
+
+# Méthodologie 
+
+## 1. Installation et Chargement des Packages 
+
+```{r packages}
+# Liste des packages nécessaires
+packages <- c("tidyverse", "lubridate", "ggplot2", "ggpubr", "zoo", "gridExtra",
+              "viridis", "scales", "forecast", "grid", "knitr", "kableExtra")
+
+# Installer les packages manquants
+new_packages <- packages[!(packages %in% installed.packages()[,"Package"])]
+
+if(length(new_packages)) {
+  install.packages(new_packages, repos = "https://cloud.r-project.org/")
+}
+
+# Charger tous les packages
+invisible(lapply(packages, library, character.only = TRUE))
+
+cat("✓ Tous les packages sont chargés\n")
+```
+
+## 2. Lecture et Inspection des Données 
+
+```{r lecture_donnees}
+# Vérifier l'existence du fichier
+if(!file.exists("co2_mm_gl.csv")) {
+  stop("ERREUR: Fichier co2_mm_gl.csv non trouvé!")
+}
+
+# Inspection des premières lignes
+cat("=== INSPECTION DES DONNÉES BRUTES ===\n\n")
+raw_lines <- readLines("co2_mm_gl.csv", n = 10)
+cat("Premières lignes du fichier:\n")
+for(i in 1:length(raw_lines)) {
+  cat(sprintf("Ligne %2d: %s\n", i, substr(raw_lines[i], 1, 100)))
+}
+
+# Lire les données (ignorer les lignes de commentaire)
+co2_raw <- read.table("co2_mm_gl.csv",
+                      header = TRUE,
+                      sep = ",",
+                      comment.char = "#",
+                      stringsAsFactors = FALSE,
+                      na.strings = c("", "NA", "-99.99"))
+
+cat("\n=== DONNÉES BRUTES CHARGÉES ===\n")
+cat("Dimensions:", dim(co2_raw)[1], "lignes x", dim(co2_raw)[2], "colonnes\n")
+cat("Période:", min(co2_raw$year), "à", max(co2_raw$year), "\n")
+cat("Colonnes:", paste(names(co2_raw), collapse = ", "), "\n")
+```
+
+## 3. Nettoyage et Préparation des Données 
+
+```{r nettoyage_donnees}
+co2_clean <- co2_raw %>%
+  # Créer une date complète
+  mutate(
+    Date = make_date(year, month, 15),  # 15 du mois comme convention
+    Date_decimal = decimal,
+    
+    # Variables principales
+    CO2_ppm = average,  # Concentration CO₂
+    CO2_uncertainty = average_unc,  # Incertitude
+    CO2_trend = trend,  # Tendance désaisonnalisée
+    Trend_uncertainty = trend_unc,
+    
+    # Identifiants et métadonnées
+    ID = row_number(),
+    
+    # Variables temporelles
+    Year = year,
+    Month = month,
+    Quarter = ceiling(month / 3),
+    
+    # Saisons (hémisphère nord)
+    Season = case_when(
+      month %in% c(12, 1, 2) ~ "Hiver",
+      month %in% c(3, 4, 5) ~ "Printemps",
+      month %in% c(6, 7, 8) ~ "Été",
+      month %in% c(9, 10, 11) ~ "Automne"
+    ),
+    
+    # Décennies
+    Decade = floor(Year / 10) * 10,
+    
+    # Périodes d'analyse
+    Period = case_when(
+      Year < 1990 ~ "1979-1989",
+      Year >= 1990 & Year < 2000 ~ "1990-1999",
+      Year >= 2000 & Year < 2010 ~ "2000-2009",
+      Year >= 2010 & Year < 2020 ~ "2010-2019",
+      Year >= 2020 ~ "2020-2025"
+    ),
+    
+    # Variables dérivées
+    CO2_anomaly = CO2_ppm - mean(CO2_ppm, na.rm = TRUE),
+    Year_fraction = Year + (Month - 0.5) / 12
+  ) %>%
+  
+  # Gérer les valeurs manquantes
+  group_by(Year) %>%
+  mutate(
+    CO2_ppm = ifelse(is.na(CO2_ppm), mean(CO2_ppm, na.rm = TRUE), CO2_ppm)
+  ) %>%
+  ungroup() %>%
+  
+  # Sélectionner et ordonner les colonnes
+  select(ID, Date, Year, Month, Quarter, Season, Decade, Period,
+         CO2_ppm, CO2_uncertainty, CO2_trend, Trend_uncertainty,
+         CO2_anomaly, Date_decimal, Year_fraction) %>%
+  
+  # Trier par date
+  arrange(Date)
+
+cat("✓ Données nettoyées\n")
+cat("Observations:", nrow(co2_clean), "\n")
+cat("Période finale:", min(co2_clean$Year), "-", max(co2_clean$Year), "\n")
+cat("Valeurs manquantes CO2:", sum(is.na(co2_clean$CO2_ppm)), "\n")
+```
+
+---
+
+# Résultats 
+
+## 1. Statistiques Descriptives 
+
+### 1.1 Statistiques Générales 
+
+```{r stats_generales}
+general_stats <- summary(co2_clean$CO2_ppm)
+
+stats_table <- data.frame(
+  "Statistique" = c("Minimum", "Quartile 1", "Médiane", "Moyenne", "Quartile 3", "Maximum"),
+  "Valeur (ppm)" = c(
+    round(general_stats[1], 2),
+    round(general_stats[2], 2),
+    round(general_stats[3], 2),
+    round(general_stats[4], 2),
+    round(general_stats[5], 2),
+    round(general_stats[6], 2)
+  )
+)
+
+knitr::kable(stats_table, caption = "Statistiques descriptives du CO₂ global") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+### 1.2 Statistiques par Décennie 
+
+```{r stats_decennie}
+decade_stats <- co2_clean %>%
+  group_by(Decade) %>%
+  summarise(
+    "Décennie" = paste0(Decade, "s"),
+    "Début" = min(Year),
+    "Fin" = max(Year),
+    "N mois" = n(),
+    "CO₂ moyen (ppm)" = round(mean(CO2_ppm, na.rm = TRUE), 2),
+    "Min (ppm)" = round(min(CO2_ppm, na.rm = TRUE), 2),
+    "Max (ppm)" = round(max(CO2_ppm, na.rm = TRUE), 2),
+    "Écart-type" = round(sd(CO2_ppm, na.rm = TRUE), 2),
+    "Augmentation (ppm)" = round(max(CO2_ppm, na.rm = TRUE) - min(CO2_ppm, na.rm = TRUE), 2),
+    .groups = 'drop'
+  ) %>%
+  select(-Decade)
+
+knitr::kable(decade_stats, caption = "Statistiques du CO₂ par décennie") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+### 1.3 Statistiques Saisonnières 
+
+```{r stats_saisons}
+season_stats <- co2_clean %>%
+  group_by(Season) %>%
+  summarise(
+    "CO₂ moyen (ppm)" = round(mean(CO2_ppm, na.rm = TRUE), 2),
+    "Écart-type" = round(sd(CO2_ppm, na.rm = TRUE), 2),
+    "Min (ppm)" = round(min(CO2_ppm, na.rm = TRUE), 2),
+    "Max (ppm)" = round(max(CO2_ppm, na.rm = TRUE), 2),
+    "Amplitude (ppm)" = round(max(CO2_ppm, na.rm = TRUE) - min(CO2_ppm, na.rm = TRUE), 2),
+    .groups = 'drop'
+  ) %>%
+  arrange(`CO₂ moyen (ppm)`)
+
+knitr::kable(season_stats, caption = "Statistiques saisonnières du CO₂") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+### 1.4 Top 5 des Années avec Concentrations les Plus Élevées 
+
+```{r top_years}
+annual_stats <- co2_clean %>%
+  group_by(Year) %>%
+  summarise(
+    "CO₂ moyen (ppm)" = round(mean(CO2_ppm, na.rm = TRUE), 2),
+    "Min (ppm)" = round(min(CO2_ppm, na.rm = TRUE), 2),
+    "Max (ppm)" = round(max(CO2_ppm, na.rm = TRUE), 2),
+    "Amplitude (ppm)" = round(max(CO2_ppm, na.rm = TRUE) - min(CO2_ppm, na.rm = TRUE), 2),
+    .groups = 'drop'
+  ) %>%
+  arrange(desc(`CO₂ moyen (ppm)`))
+
+knitr::kable(head(annual_stats, 5), caption = "Top 5 des années avec concentrations les plus élevées") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+---
+
+## 2. Analyses Avancées 
+
+### 2.1 Analyse de Tendance Linéaire 
+
+```{r regression_lineaire}
+# Régression linéaire
+lm_model <- lm(CO2_ppm ~ Year_fraction, data = co2_clean)
+lm_summary <- summary(lm_model)
+
+trend_results <- data.frame(
+  "Paramètre" = c("Pente", "Ordonnée à l'origine", "R²", "p-value"),
+  "Valeur" = c(
+    round(coef(lm_model)[2], 4),
+    round(coef(lm_model)[1], 2),
+    round(lm_summary$r.squared, 4),
+    format.pval(lm_summary$coefficients[2, 4], digits = 3)
+  ),
+  "Interprétation" = c(
+    "ppm/année",
+    "ppm (1900)",
+    "ajustement du modèle",
+    "très significatif"
+  )
+)
+
+knitr::kable(trend_results, caption = "Résultats de la régression linéaire CO₂ ~ Temps") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+**Interprétation:** La concentration de CO₂ augmente de **`r round(coef(lm_model)[2], 3)` ppm par année** avec une très bonne corrélation (R² = `r round(lm_summary$r.squared, 3)`).
+
+### 2.2 Augmentation Totale (1979-2025) 
+
+```{r augmentation_totale}
+co2_1979 <- mean(co2_clean$CO2_ppm[co2_clean$Year == 1979], na.rm = TRUE)
+co2_2025 <- mean(co2_clean$CO2_ppm[co2_clean$Year == 2025], na.rm = TRUE)
+augmentation_abs <- co2_2025 - co2_1979
+augmentation_pct <- (co2_2025 - co2_1979) / co2_1979 * 100
+taux_annuel <- (co2_2025 - co2_1979) / (2025 - 1979)
+
+augmentation_table <- data.frame(
+  "Année" = c("1979", "2025", "Différence"),
+  "CO₂ (ppm)" = c(
+    round(co2_1979, 1),
+    round(co2_2025, 1),
+    round(augmentation_abs, 1)
+  ),
+  "% d'augmentation" = c(
+    "-",
+    "-",
+    round(augmentation_pct, 1)
+  )
+)
+
+knitr::kable(augmentation_table, caption = "Augmentation du CO₂ de 1979 à 2025") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+
+cat("\n**Taux annuel moyen:** ", round(taux_annuel, 2), " ppm/an\n")
+```
+
+### 2.3 Analyse de Saisonnalité 
+
+```{r saisonnalite}
+seasonal_amplitude <- max(season_stats$`CO₂ moyen (ppm)`) - min(season_stats$`CO₂ moyen (ppm)`)
+
+saisonnalite_table <- data.frame(
+  "Saison la plus élevée" = season_stats$Season[which.max(season_stats$`CO₂ moyen (ppm)`)],
+  "CO₂ max (ppm)" = round(max(season_stats$`CO₂ moyen (ppm)`), 2),
+  "Saison la plus basse" = season_stats$Season[which.min(season_stats$`CO₂ moyen (ppm)`)],
+  "CO₂ min (ppm)" = round(min(season_stats$`CO₂ moyen (ppm)`), 2),
+  "Amplitude (ppm)" = round(seasonal_amplitude, 2)
+)
+
+knitr::kable(saisonnalite_table, caption = "Analyse de la saisonnalité du CO₂") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+---
+
+## 3. Visualisations
+
+### 3.1 Évolution Temporelle Complète (1979-2025)
+
+```{r plot_evolution_complete}
+p1 <- ggplot(co2_clean, aes(x = Date, y = CO2_ppm)) +
+  geom_line(color = "#E41A1C", linewidth = 1, alpha = 0.8) +
+  geom_smooth(method = "loess", span = 0.1, color = "#377EB8",
+              linetype = "dashed", se = FALSE, linewidth = 1) +
+  geom_smooth(method = "lm", color = "#4DAF4A", se = FALSE, linewidth = 0.8) +
+  labs(
+    title = "Évolution des concentrations CO₂ globales (1979-2025)",
+    subtitle = "Source: NOAA Global Monitoring Laboratory",
+    x = "Année",
+    y = "CO₂ (ppm)",
+    caption = paste("Pente:", round(coef(lm_model)[2], 3), "ppm/an | R²:", round(lm_summary$r.squared, 3))
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 16),
+    plot.subtitle = element_text(hjust = 0.5, color = "gray40"),
+    plot.caption = element_text(hjust = 1, color = "gray50"),
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA)
+  ) +
+  scale_y_continuous(limits = c(330, 440)) +
+  scale_x_date(date_breaks = "5 years", date_labels = "%Y")
+
+print(p1)
+```
+
+**Commentaire:** Ce graphique démontre l'augmentation anthropogénique incontestable du CO₂ à l'échelle globale, avec une tendance robuste et systématique sur 46 ans.
+
+### 3.2 Cycle Saisonnier du CO₂
+
+```{r plot_cycle_saison}
+p2 <- ggplot(co2_clean, aes(x = Month, y = CO2_ppm)) +
+  geom_jitter(alpha = 0.1, color = "gray70", width = 0.2) +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               color = "#984EA3", linewidth = 1.5) +
+  stat_summary(fun = mean, geom = "point", aes(group = 1),
+               color = "#984EA3", size = 3) +
+  stat_summary(fun.data = mean_cl_normal, geom = "ribbon",
+               aes(group = 1), alpha = 0.2, fill = "#984EA3") +
+  labs(
+    title = "Cycle saisonnier du CO₂ global",
+    subtitle = "Moyenne mensuelle avec intervalle de confiance",
+    x = "Mois",
+    y = "CO₂ (ppm)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb)
+
+print(p2)
+```
+
+**Commentaire:**Ce graphique révèle le cycle saisonnier du CO₂ en montrant la moyenne mensuelle sur l'ensemble de la période 1979-2025. 
+Le cycle saisonnier montre un maximum au printemps et un minimum en automne, reflétant les cycles de photosynthèse de l'hémisphère nord.
+Ce graphique démontre que malgré l'augmentation globale du CO₂, les cycles biologiques naturels continuent de fonctionner régulièrement, créant une oscillation saisonnière mesurable et fiable.
+
+### 3.3 Évolution du Cycle Saisonnier par Décennie
+
+```{r plot_saison_decennie}
+seasonal_by_decade <- co2_clean %>%
+  group_by(Decade, Month) %>%
+  summarise(
+    CO2_mean = mean(CO2_ppm, na.rm = TRUE),
+    CO2_sd = sd(CO2_ppm, na.rm = TRUE),
+    N = n(),
+    .groups = 'drop'
+  ) %>%
+  mutate(
+    Month_name = factor(month.abb[Month], levels = month.abb),
+    Decade_label = paste0(Decade, "s")
+  )
+
+p3 <- ggplot(seasonal_by_decade, aes(x = Month_name, y = CO2_mean,
+                                      color = Decade_label, group = Decade_label)) +
+  geom_line(linewidth = 1.2, alpha = 0.8) +
+  geom_point(size = 2.5) +
+  labs(
+    title = "Évolution du cycle saisonnier par décennie",
+    subtitle = "Moyenne mensuelle pour chaque décennie (1979-2025)",
+    x = "Mois",
+    y = "CO₂ (ppm)",
+    color = "Décennie"
+  ) +
+  scale_color_viridis_d(option = "D", begin = 0.2, end = 0.9) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 15),
+    plot.subtitle = element_text(hjust = 0.5, color = "gray40"),
+    legend.position = "right",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  scale_x_discrete(limits = month.abb)
+
+print(p3)
+```
+
+**Commentaire:**Ce graphique superpose les cycles saisonniers de six décennies pour montrer comment le phénomène naturel du cycle du CO₂ a évolué au fil du temps.
+ Chaque décennie "ajoute une marche" à l'escalier du CO₂ atmosphérique, confirmant une augmentation systématique et inexorable depuis 1979.
+
+### 3.4 Distribution du CO₂ par Décennie
+
+```{r plot_boxplot_decennie}
+p4 <- ggplot(co2_clean, aes(x = factor(Decade), y = CO2_ppm, fill = factor(Decade))) +
+  geom_boxplot(alpha = 0.7, outlier.alpha = 0.3) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white") +
+  labs(
+    title = "Distribution du CO₂ par décennie",
+    subtitle = "Boîtes: distribution interquartile | Losanges: moyenne",
+    x = "Décennie",
+    y = "CO₂ (ppm)",
+    fill = "Décennie"
+  ) +
+  scale_fill_viridis_d(option = "C", begin = 0.2, end = 0.9) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  scale_y_continuous(limits = c(330, 440))
+
+print(p4)
+```
+
+**Commentaire:**Ce graphique est une transformation mathématique du précédent qui révèle une vérité importante : il montre l'anomalie du CO₂, c'est-à-dire l'écart par rapport à la normale climatologique mensuelle. En d'autres termes, il supprime les variations saisonnières pour ne montrer que le "surplus de CO₂" au-delà de ce qui est attendu pour chaque mois.
+
+### 3.5 Anomalies du CO₂ par Rapport à la Moyenne Mensuelle
+
+```{r plot_anomalies}
+co2_monthly_avg <- co2_clean %>%
+  group_by(Month) %>%
+  summarise(monthly_avg = mean(CO2_ppm, na.rm = TRUE))
+
+co2_anomalies <- co2_clean %>%
+  left_join(co2_monthly_avg, by = "Month") %>%
+  mutate(anomaly = CO2_ppm - monthly_avg)
+
+p5 <- ggplot(co2_anomalies, aes(x = Date, y = anomaly)) +
+  geom_line(color = "#FF7F00", linewidth = 0.7, alpha = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_smooth(method = "loess", span = 0.2, color = "#A65628", se = FALSE) +
+  labs(
+    title = "Anomalies du CO₂ par rapport à la moyenne mensuelle",
+    subtitle = "Écart à la moyenne climatologique mensuelle",
+    x = "Année",
+    y = "Anomalie CO₂ (ppm)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
+    plot.subtitle = element_text(hjust = 0.5, color = "gray40")
+  ) +
+  scale_x_date(date_breaks = "5 years", date_labels = "%Y")
+
+print(p5)
+```
+
+**Commentaire:**Ce graphique utilise un diagramme en boîte (boxplot) pour comparer la distribution du CO₂ à travers six décennies.Chaque génération depuis 1979 a vécu dans une atmosphère avec ~20 ppm de CO₂ supplémentaire par rapport à la génération précédente.
+
+### 3.6 Taux de Croissance Annuel du CO₂
+
+```{r plot_croissance_annuelle}
+annual_growth <- co2_clean %>%
+  group_by(Year) %>%
+  summarise(mean_co2 = mean(CO2_ppm, na.rm = TRUE)) %>%
+  mutate(
+    growth = mean_co2 - lag(mean_co2),
+    growth_rate = (mean_co2 - lag(mean_co2)) / lag(mean_co2) * 100
+  ) %>%
+  filter(!is.na(growth))
+
+p6 <- ggplot(annual_growth, aes(x = Year, y = growth)) +
+  geom_col(fill = "#F781BF", alpha = 0.7) +
+  geom_hline(yintercept = mean(annual_growth$growth, na.rm = TRUE),
+             linetype = "dashed", color = "#E41A1C", linewidth = 1) +
+  geom_smooth(method = "loess", color = "#377EB8", se = FALSE, linewidth = 0.8) +
+  labs(
+    title = "Augmentation annuelle du CO₂",
+    subtitle = paste("Moyenne:", round(mean(annual_growth$growth, na.rm = TRUE), 2), "ppm/an"),
+    x = "Année",
+    y = "Augmentation (ppm/an)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5, color = "gray40")
+  ) +
+  scale_x_continuous(breaks = seq(1980, 2025, by = 5))
+
+print(p6)
+```
+
+**Commentaire:**Ce graphique montre l'augmentation année-par-année du CO₂.
+Bien que l'augmentation du CO₂ varie d'année en année, la tendance générale (ligne bleue) montre clairement une accélération du taux d'augmentation. Le problème ne s'améliore pas ; il s'aggrave. La moyenne de 1.93 ppm/an masque le fait que les années récentes augmentent plus vite (~2.7 ppm/an), ce qui indique une urgence croissante de la crise climatique.
+
+---
+
+## 4. Tableaux Synthétiques Avancés
+
+### 4.1 Amplitude Saisonnière par Décennie
+
+```{r amplitude_decennie}
+seasonal_amplitude_by_decade <- seasonal_by_decade %>%
+  group_by(Decade, Decade_label) %>%
+  summarise(
+    "Amplitude (ppm)" = round(max(CO2_mean) - min(CO2_mean), 2),
+    "CO₂ min (ppm)" = round(min(CO2_mean), 2),
+    "CO₂ max (ppm)" = round(max(CO2_mean), 2),
+    .groups = 'drop'
+  ) %>%
+  select(-Decade)
+
+knitr::kable(seasonal_amplitude_by_decade, 
+             caption = "Amplitude saisonnière du CO₂ par décennie") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+### 4.2 Taux de Croissance du CO₂ par Décennie
+
+```{r taux_croissance_decennie}
+decade_slopes <- co2_clean %>%
+  group_by(Decade) %>%
+  do(
+    data.frame(
+      Decade = unique(.$Decade),
+      Pente_ppm_par_an = round(coef(lm(CO2_ppm ~ Year_fraction, data = .))[2], 4),
+      R_squared = round(summary(lm(CO2_ppm ~ Year_fraction, data = .))$r.squared, 4)
+    )
+  )
+
+knitr::kable(decade_slopes, 
+             caption = "Pente de croissance du CO₂ par décennie",
+             col.names = c("Décennie", "Pente (ppm/an)", "R²")) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+---
+
+# Discussion 
+
+## Principaux Résultats
+
+1. **Tendance générale:** Les concentrations de CO₂ augmentent de manière **consistante et significative**, avec une pente de **`r round(coef(lm_model)[2], 3)` ppm par année**.
+
+2. **Augmentation totale:** Depuis 1979, le CO₂ a augmenté de **`r round(co2_2025 - co2_1979, 1)` ppm**, soit une augmentation relative de **`r round(augmentation_pct, 1)`%**.
+
+3. **Saisonnalité:** L'amplitude saisonnière moyenne est de **`r round(seasonal_amplitude, 2)` ppm**, le maximum étant atteint au **Printemps** et le minimum en **Automne**.
+
+4. **Accélération:** L'analyse des taux de croissance annuels montre une variabilité d'une année à l'autre, avec une tendance à l'augmentation globale.
+
+## Implications
+
+- Les données confirment l'**augmentation anthropogénique du CO₂** observée mondialement
+- La régularité de cette augmentation souligne la **nature systématique** du problème
+- La saisonnalité reflète les **cycles biologiques naturels** (photosynthèse, respiration)
+
+## Limitations et Perspectives
+
+- Les données proviennent d'une seule source (NOAA), mais celle-ci est **reconnue internationalement**
+- Les analyses futures pourraient intégrer d'autres **variables climatiques** (température, humidité)
+- Une **comparaison régionale** avec d'autres stations de mesure enrichirait l'analyse
+
+---
+
+# Conclusion 
+Cette analyse des données NOAA (1979-2025) démontre sans ambiguïté l'augmentation continue et significative des concentrations de CO₂ atmosphérique à l'échelle mondiale. Avec une pente linéaire de 1.88 ppm/an et un excellent ajustement statistique (R² = 0.985), les résultats confirment que cette hausse n'est pas due au hasard ou à la variabilité naturelle, mais représente une tendance structurelle majeure. L'augmentation totale de 88.6 ppm en 46 ans (26% d'accroissement relatif) constitue une signature incontestable du changement climatique anthropogénique. Bien que la saisonnalité naturelle soit préservée (cycle régulier de ~2.8 ppm), elle survient désormais sur un niveau de base en hausse permanente, escalade décennie par décennie. Ces observations confirment l'urgence d'une action globale pour réduire les émissions de CO₂, car le système climatique répond directement et proportionnellement à l'accumulation de ce gaz à effet de serre.
+
+---
+
+# Annexe: Code Complet du Nettoyage
+
+```{r code_complet, eval=FALSE}
+# Script complet de préparation des données
+
+# 1. Packages
+packages <- c("tidyverse", "lubridate", "ggplot2", "ggpubr", "zoo", "gridExtra",
+              "viridis", "scales", "forecast", "grid", "knitr", "kableExtra")
+invisible(lapply(packages, library, character.only = TRUE))
+
+# 2. Lecture
+co2_raw <- read.table("co2_mm_gl.csv",
+                      header = TRUE,
+                      sep = ",",
+                      comment.char = "#",
+                      stringsAsFactors = FALSE,
+                      na.strings = c("", "NA", "-99.99"))
+
+# 3. Nettoyage
+co2_clean <- co2_raw %>%
+  mutate(
+    Date = make_date(year, month, 15),
+    CO2_ppm = average,
+    CO2_trend = trend,
+    CO2_anomaly = average - mean(average, na.rm = TRUE),
+    Year = year,
+    Month = month,
+    Decade = floor(year / 10) * 10,
+    Year_fraction = year + (month - 0.5) / 12,
+    Season = case_when(
+      month %in% c(12, 1, 2) ~ "Hiver",
+      month %in% c(3, 4, 5) ~ "Printemps",
+      month %in% c(6, 7, 8) ~ "Été",
+      month %in% c(9, 10, 11) ~ "Automne"
+    )
+  ) %>%
+  group_by(Year) %>%
+    mutate(
+      CO2_ppm = ifelse(is.na(CO2_ppm), mean(CO2_ppm, na.rm = TRUE), CO2_ppm)
+    ) %>%
+  ungroup() %>%
+  select(Date, Year, Month, CO2_ppm, CO2_trend, CO2_anomaly, Season, Decade, Year_fraction) %>%
+  arrange(Date)
+```
+
+---
+
+**Rapport généré le:** `r format(Sys.Date(), "%d %B %Y")`  
+**Source des données:** NOAA Global Monitoring Laboratory  
+**Période analysée:** 1979-2025
