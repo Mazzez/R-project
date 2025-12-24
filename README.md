@@ -14,9 +14,12 @@ This project analyzes the evolution of global atmospheric CO₂ concentrations u
 
 1. Install R (RStudio is recommended).
 2. Clone this repository:
+
 git clone https://github.com/Mazzez/R-project.git
+
 cd R-project
-3. Install the required R packages:
+4. Install the required R packages:
+
 install.packages(c(
 "tidyverse","lubridate","ggplot2","ggpubr","zoo",
 "gridExtra","viridis","scales","forecast","grid",
@@ -28,6 +31,7 @@ install.packages(c(
 ### 1. Script-based analysis
 
 Run in R/RStudio:
+
 source("main_final.r")
 
 This script:
@@ -43,8 +47,11 @@ Open `rapport_co2.rmd` in RStudio and click **Knit** to generate the full HTML r
 ### 3. Shiny application
 
 Launch the interactive app:
+
 source("app_shiny_co2.r")
+
 or
+
 shiny::runApp("app_shiny_co2.r")
 
 
