@@ -18,7 +18,8 @@ This project analyzes the evolution of global atmospheric CO₂ concentrations u
 git clone https://github.com/Mazzez/R-project.git
 
 cd R-project
-4. Install the required R packages:
+
+3. Install the required R packages:
 
 install.packages(c(
 "tidyverse","lubridate","ggplot2","ggpubr","zoo",
