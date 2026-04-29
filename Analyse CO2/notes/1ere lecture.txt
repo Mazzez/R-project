@@ -1,0 +1,133 @@
+ 1. Sources et périodes (rappel des datasets GDEX)
+
+  ┌─────────┬───────────┬───────────────────────────────────────────────────────────┬──────────────────────────────────────────────────────┬────────────────┐
+  │ Période │ Code GDEX │                          Produit                          │                       Fichiers                       │     Couvre     │
+  ├─────────┼───────────┼───────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────┼────────────────┤
+  │ 1       │ d093002   │ CFSR — Climate Forecast System Reanalysis                 │ pgbh04.gdas.YYYY.tar (annuel), pgbl04.gdas.YYYY.tar  │ 1979 → 2010    │
+  ├─────────┼───────────┼───────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────┼────────────────┤
+  │ 2       │ d094002   │ CFSv2 — Climate Forecast System v2 (operational analysis) │ pgbh.gdas.YYYYMM.tar, pgbl.gdas.YYYYMM.tar (mensuel) │ 2011 → présent │
+  └─────────┴───────────┴───────────────────────────────────────────────────────────┴──────────────────────────────────────────────────────┴────────────────┘
+
+  Conventions de nommage utiles :
+  - pgb = fichier GRIB sur niveaux de pression
+  - pgbh = haute résolution 0.5° × 0.5°
+  - pgbl = basse résolution 2.5° × 2.5°
+  - gdas = Global Data Assimilation System (cycle d'analyse)
+  - Les fichiers binaires sont au format GRIB2 (Gridded binary version 2 confirmé par file)
+
+  2. État réel sur disque
+
+  /home/mazzez/Bureau/R project/Data/
+  ├── 0.5° x 0.5°/   → 57 GB  (48 dossiers année : 1979 → 2026)
+  ├── 2.5° x 2.5°/   →  3.5 GB (48 dossiers année)
+  └── CO2/co2_mm_gl.csv  → 600 lignes (1979-01 → 2025-09)
+
+  Les .tar listés dans Final project / Final_project ont déjà été extraits par organize_and_extract.py puis supprimés. Chaque dossier YYYY/ contient les fichiers mensuels GRIB2 :
+  - 1979-2010 : extension .grb2 (issus de CFSR)
+  - 2011-2026 : extension .grib2 (issus de CFSv2)
+
+  3. Anomalies / lacunes détectées
+
+  À garder en tête avant l'analyse statistique :
+
+  1. Juin 2017 manquant dans les deux résolutions du jeu CFSv2 (pgbh04.gdas.201706.grib2 et pgbl04.gdas.201706.grib2 absents). Pour la 0.5° c'est confirmé à la fois dans le dump initial et après extraction → vraie lacune côté source,
+  pas une erreur d'extraction.
+  2. 2026 incomplet : seulement janvier-mars en 0.5°, et dossier 2026 vide en 2.5° → à exclure ou compléter.
+  3. Le fichier Final project (dump 0.5°) liste deux fois pgbh.gdas.201106.tar — simple doublon de listing, pas un vrai doublon de données.
+  4. Le CSV CO2 NOAA s'arrête à septembre 2025 (date de création du fichier : 5 décembre 2025). Les mois climatiques après cette date n'auront pas de pendant CO2 → la fenêtre d'analyse correlative utile est 1979-01 → 2025-09.
+
+  4. Le dataset CO2 (NOAA GML, co2_mm_gl.csv)
+
+  Moyennes mensuelles globales en ppm, 561 observations utiles. Colonnes :
+  - year, month, decimal (date décimale)
+  - average : moyenne mensuelle
+  - average_unc : incertitude
+  - trend : moyenne désaisonnalisée
+  - trend_unc : incertitude du trend
+
+  Les valeurs vont de 336.56 ppm (jan 1979) à 426.87 ppm (avr 2025) → +90 ppm sur 46 ans, signal très propre. Pour
+  la corrélation, je recommande d'utiliser trend (déjà désaisonnalisé) pour éviter de mélanger le cycle saisonnier
+  CO2 avec le cycle saisonnier climatique.
+
+  5. Implication technique majeure pour R
+
+  R ne lit pas nativement le GRIB2. Trois voies possibles :
+
+  ┌────────────────────────────────────────────────────────┬──────────────────────────────────────────────┬──────────────────────────────────────┬─────────────────────────────────────────┐
+  │                        Approche                        │                    Outils                    │               Avantage               │                  Coût                   │
+  ├────────────────────────────────────────────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────┤
+  │ terra::rast() (ou stars::read_stars()) sur GRIB2       │ dépend du backend GDAL compilé avec libgrib2 │ direct dans R                        │ demande GDAL ≥ 3 avec support grib      │
+  ├────────────────────────────────────────────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────┤
+  │ Conversion préalable GRIB2 → NetCDF avec cdo ou wgrib2 │ shell externe                                │ NetCDF lu nativement par ncdf4/terra │ un script de conversion                 │
+  ├────────────────────────────────────────────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────┤
+  │ Lecture via rNOMADS ou gribr                           │ packages R dédiés                            │ tout en R                            │ packages plus fragiles, moins maintenus │
+  └────────────────────────────────────────────────────────┴──────────────────────────────────────────────┴──────────────────────────────────────┴─────────────────────────────────────────┘
+
+  Volume : 57 GB en 0.5° est démesuré pour un projet de classe centré sur des moyennes mensuelles globales. Je te recommande fortement de partir du 2.5° (3.5 GB) qui suffit largement à une corrélation globale CO2 ↔ température / humidité. Le 0.5° n'a d'intérêt que si tu veux faire des cartes régionales fines.
+
+  6. Variables disponibles dans les fichiers pgb
+
+  Les produits pgb (« pressure grid binary ») contiennent typiquement, sur plusieurs niveaux de pression, la température, le géopotentiel, l'humidité relative, les composantes du vent (U/V), la vitesse verticale, la pression de surface,
+   et les précipitations totales. Pour confirmer la liste exacte présente dans tes fichiers, il faudra exécuter wgrib2 -V sur un fichier (ex. pgbl04.gdas.197901.grb2) — je peux te générer le script si tu veux.
+
+  7. Ce que je te suggère comme prochaine étape
+
+  Avant d'écrire le code R, deux décisions à prendre :
+  - Question scientifique précise : corrélation CO2 ↔ température moyenne globale 2 m ? Ou anomalies régionales ? Ou plusieurs variables (T, précipitations, humidité) ?
+  - Choix de résolution : je conseille 2.5° comme base de travail.
+
+● Analyse complète délivrée ci-dessus. Pour résumer ce que je retiens :
+
+  - Climat : 57 GB en 0.5° et 3.5 GB en 2.5°, GRIB2 mensuels, transition CFSR (1979-2010) → CFSv2 (2011-2026), tous les .tar déjà extraits.
+  - CO2 : CSV NOAA GML, 1979-01 → 2025-09, contient déjà une série désaisonnalisée (trend) idéale pour la corrélation.
+  - Fenêtre commune utile : 1979-01 → 2025-09.
+  - Lacunes à anticiper : juin 2017 manquant, 2026 partiel.
+  - Décision technique principale : R ne lit pas le GRIB2 nativement — il faudra terra/stars avec GDAL-grib, ou conversion préalable en NetCDF via cdo/wgrib2. Le 2.5° est probablement la bonne base pour un projet de classe.
+
+
+  ┌─────┬───────┬──────────────────┬────────────────────────────────────────────────┐
+  │  #  │ Code  │      Niveau      │                      Rôle                      │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 1   │ TMP   │ 2 m above ground │ Température air                                │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 2   │ TMP   │ 500 hPa          │ Mid-troposphère                                │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 3   │ SPFH  │ 2 m above ground │ Humidité spécifique                            │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 4   │ PWAT  │ colonne          │ Vapeur d'eau intégrée                          │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 5   │ APCP  │ surface          │ Précipitations (cumul)                         │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 6   │ TCDC  │ colonne          │ Couverture nuageuse totale                     │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 7   │ DLWRF │ surface          │ LW descendant (effet de serre)                 │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 8   │ ULWRF │ surface          │ LW ascendant                                   │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 9   │ DSWRF │ surface          │ SW descendant                                  │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 10  │ PRMSL │ mean sea level   │ Pression réduite                               │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 11  │ USWRF │ surface          │ SW réfléchi (couplé à ALBDO)                   │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 12  │ CSDSF │ surface          │ SW descendant ciel clair (forçage hors nuages) │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 13  │ CSUSF │ surface          │ SW ascendant ciel clair                        │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 14  │ CSDLF │ surface          │ LW descendant ciel clair (effet de serre nu)   │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 15  │ CSULF │ surface          │ LW ascendant ciel clair                        │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 16  │ CDUVB │ surface          │ UV-B ciel clair                                │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 17  │ DUVB  │ surface          │ UV-B all-sky                                   │
+  ├─────┼───────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 18  │ ALBDO │ surface          │ Albédo de surface                              │
+  └─────┴───────┴──────────────────┴────────────────────────────────────────────────┘
+
+  Bénéfice analytique : avec all-sky et clear-sky en SW comme en LW, tu peux calculer les Cloud Radiative Effects (CRE) :
+  - CRE_SW = (DSWRF - USWRF) - (CSDSF - CSUSF)
+  - CRE_LW = (DLWRF - ULWRF) - (CSDLF - CSULF)
+  - CRE_net = CRE_SW + CRE_LW
+
+  → permet de séparer le forçage radiatif direct du CO2 de la rétroaction des nuages, ce qui est exactement le cœur scientifique de ton sujet.

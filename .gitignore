@@ -1,0 +1,7 @@
+.RData
+.Rhistory
+.Rproj.user/
+*_cache/
+cache/
+.DS_Store
+.idea/
