@@ -1,78 +1,82 @@
-# R-project
-# Global CO₂ Concentration Analysis (1979–2025)
+# Analyse CO2 — Projet R Climat & CO2
 
-This project analyzes the evolution of global atmospheric CO₂ concentrations using monthly data from the **NOAA Global Monitoring Laboratory** for the period 1979–2025.[file:3][file:1][file:2]
+Première phase du projet : analyse statistique complète de la concentration atmosphérique mondiale de CO2 sur la période 1979-2025, mise en perspective avec Mauna Loa, le Global Carbon Budget, l'enregistrement paléo de Vostok, et l'indice ENSO.
 
-## Project structure
+## Structure du dossier
 
-- `co2_mm_gl.csv`: Monthly global CO₂ data provided by NOAA GML (ppm).[file:3]
-- `main_final.r`: Main R script for data cleaning, statistical analysis, and generation of plots and summary CSV files.[file:2]
-- `rapport_co2.rmd`: Full R Markdown report (statistics, visualizations, interpretation) and the generated `rapport_co2.html` report.[file:1]
-- `app_shiny_co2.r`: **R Shiny** application for interactive exploration of the time series, seasons, decades, and detailed statistics.[file:4]
+```
+Analyse CO2/
+├── scripts/                          Code R exécutable, à lancer dans cet ordre
+│   ├── 00_install_packages.R         installation des 14 packages CRAN
+│   ├── co2_analysis.R                sections 1-8   (analyse de base)
+│   ├── co2_analysis_extended.R       sections 9-11  (Mauna Loa + GCB + Vostok)
+│   └── co2_analysis_methodology.R    sections 12-23 (raffinements + enrichissements)
+│
+├── rapport/                          Rapport reproductible
+│   ├── CO2_report.Rmd                source RMarkdown unique (23 sections)
+│   ├── CO2_report.html               version HTML rendue (à ouvrir dans un navigateur)
+│   ├── CO2_report.md                 version markdown brute
+│   ├── figure/                       figures du knit Markdown brut
+│   ├── CO2_report_files/             figures du knit HTML
+│   ├── cache/, CO2_report_cache/     caches knitr (regeneration rapide)
+│
+├── outputs/                          Sorties des scripts (37 fichiers : 30 PNG + 7 CSV)
+│   ├── 03_stl_decomposition.png      ... 23a_ssm_level.png, 23b_ssm_slope.png
+│   ├── stats_decennie.csv
+│   ├── amplitude_saisonniere_decennie.csv
+│   ├── taux_annuel.csv
+│   ├── fraction_airborne.csv
+│   ├── cv_arima.csv
+│   ├── covid_anomalie.csv
+│   └── ssm_components.csv
+│
+└── notes/                            Documentation manuelle / récap
+    ├── Récapitulatif détaillé — Analyse CO2.txt
+    ├── 1ere lecture.txt
+    └── general view/
+```
 
-## Installation
+## Sources de données
 
-1. Install R (RStudio is recommended).
-2. Clone this repository:
+Toutes situées dans `/home/mazzez/Bureau/R project/Data/CO2/` :
 
-git clone https://github.com/Mazzez/R-project.git
+| Dataset | Fichier | Période |
+|---|---|---|
+| CO2 mondial moyen mensuel (NOAA GML) | `co2_mm_gl.csv` | 1979-01 → 2025-09 |
+| CO2 Mauna Loa (NOAA / SIO) | `co2_mm_mlo.csv` | 1958-03 → 2026-02 |
+| CO2 South Pole flask (NOAA) | `co2_spo_surface-flask_1_ccgg_month.txt` | 1975-07 → 2024-12 |
+| Émissions CO2 fossiles (Global Carbon Budget 2025v15) | `GCB2025v15_MtCO2_flat.csv` | 1750 → 2024 |
+| CO2 paléo Vostok (NOAA Paleoclimatology) | `co2nat-noaa.txt` | 414 085 → 2 342 BP |
+| Indice ENSO Niño 3.4 (NOAA CPC) | `oni.ascii.txt` | 1950 → présent |
 
-cd R-project
+## Reproduire l'analyse
 
-3. Install the required R packages:
+```bash
+cd "/home/mazzez/Bureau/R project/Final Version/Analyse CO2/scripts"
+Rscript 00_install_packages.R
+Rscript co2_analysis.R
+Rscript co2_analysis_extended.R
+Rscript co2_analysis_methodology.R
+```
 
-install.packages(c(
-"tidyverse","lubridate","ggplot2","ggpubr","zoo",
-"gridExtra","viridis","scales","forecast","grid",
-"knitr","kableExtra","shiny","plotly","DT","shinyWidgets","bslib"
-))
+Pour régénérer le rapport HTML (nécessite `pandoc`) :
 
-## Usage
+```bash
+cd "../rapport"
+Rscript -e 'rmarkdown::render("CO2_report.Rmd")'
+```
 
-### 1. Script-based analysis
+## Conclusions principales
 
-Run in R/RStudio:
+1. Hausse confirmée et accélérée : **+86 ppm en 47 ans**, taux de Sen 1.881 ppm/an [IC 95 % 1.774-1.965].
+2. AIC privilégie un modèle exponentiel (r = 0.5 %/an, doublement 137 ans) au modèle linéaire.
+3. Cycle saisonnier en élargissement : **+18 %** d'amplitude entre 1980s et 2020s. Ratio NH/SH = 5.6×.
+4. **53 %** des émissions fossiles 1980-2024 restent dans l'atmosphère (fraction airborne).
+5. Hausse moderne **30× plus rapide** que toute hausse paléo des 414 000 dernières années.
+6. ENSO module le taux annuel avec un lag de 6 mois (r = +0.28).
+7. Effet COVID-19 mesurable mais faible : −1.86 ppm cumulés en 2020-2021.
+8. Sept ruptures de régime détectées (1987, 1992, 1998, 2002, 2009, 2015, 2021).
 
-source("main_final.r")
+## Suite
 
-This script:
-- cleans `co2_mm_gl.csv`,
-- computes descriptive statistics (annual, seasonal, by decade),
-- creates the main figures,
-- saves several CSV summary files in the `processed/` folder (cleaned data, annual summary, monthly climatology, decade trends, etc.).[file:2]
-
-### 2. R Markdown report
-
-Open `rapport_co2.rmd` in RStudio and click **Knit** to generate the full HTML report (`rapport_co2.html`).[file:1]
-
-### 3. Shiny application
-
-Launch the interactive app:
-
-source("app_shiny_co2.r")
-
-or
-
-shiny::runApp("app_shiny_co2.r")
-
-
-The app allows you to:
-- filter by time period and seasons,
-- visualize temporal evolution, seasonal cycle, decade distributions,
-- inspect statistics by year, decade, and season,
-- download filtered data as CSV.[file:4]
-
-## Key results
-
-- Total increase of about **88.6 ppm** between 1979 and 2025 (≈ **26%** relative increase).[file:1][file:2]
-- Global linear trend ≈ **1.88 ppm/year** with **R² ≈ 0.985**.[file:1][file:2]
-- Mean seasonal amplitude of about **2.8 ppm**, with maximum in spring and minimum in autumn (Northern Hemisphere).[file:1][file:2]
-- Evidence of an accelerating growth rate in recent decades, shown by annual growth and decade-specific slopes.[file:1][file:2][file:4]
-
-## Data source
-
-Data are from the **NOAA Global Monitoring Laboratory (GML)**:  
-https://gml.noaa.gov/ccgg/trends/ [file:3]
-
-Please cite NOAA GML appropriately if you reuse these data in publications or reports.
-
+La phase 2 du projet (à venir) traitera l'**extraction et la corrélation des 18 variables climatiques globales** issues des réanalyses NCAR (CFSR 1979-2010 + CFSv2 2011-2025) à la résolution 2.5° × 2.5°.
