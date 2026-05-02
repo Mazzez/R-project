@@ -15,6 +15,8 @@ Analyse CO2/
 ├── rapport/                          Rapport reproductible
 │   ├── CO2_report.Rmd                source RMarkdown unique (23 sections)
 │   ├── CO2_report.html               version HTML rendue (à ouvrir dans un navigateur)
+│   ├── CO2_final_report.Rmd          source RMarkdown unique (13 sections)
+│   ├── CO2_final_report.html         version HTML rendue (à ouvrir dans un navigateur)
 │   ├── CO2_report.md                 version markdown brute
 │   ├── figure/                       figures du knit Markdown brut
 │   ├── CO2_report_files/             figures du knit HTML
@@ -63,7 +65,7 @@ Pour régénérer le rapport HTML (nécessite `pandoc`) :
 
 ```bash
 cd "../rapport"
-Rscript -e 'rmarkdown::render("CO2_report.Rmd")'
+Rscript -e 'rmarkdown::render("CO2_final_report.Rmd")'
 ```
 
 ## Conclusions principales
