@@ -1,0 +1,229 @@
+Phase 4 — Lien climat ↔ CO2
+
+  A. Objectif
+
+  Étudier la relation statistique entre les 18 variables climatiques globales (+ 3 CRE dérivés) et la concentration atmosphérique mondiale de CO2 (NOAA GML, série co2_trend désaisonnée).
+
+  Trois questions guident l'analyse :
+
+  1. La trajectoire du CO2 et celle des variables climatiques sont-elles statistiquement liées AU-DELÀ de leur tendance commune ?
+  2. Si oui, quelles variables expliquent le mieux la variance INTERANNUELLE du CO2 ?
+  3. Le sens du lien est-il climat → CO2 (carbon cycle response) ou CO2 → climat (forçage radiatif direct) à l'échelle de quelques mois à quelques années ?
+
+  Note : la phase 4 utilise les données après homogénéisation CFSR/CFSv2 (phase 3). Sur les niveaux bruts, les corrélations sont fallacieusement amplifiées par le saut technique de jan 2011.
+
+  B. Préparation : 5 représentations temporelles (05_preparation.R)
+
+  Les niveaux bruts du climat et du CO2 partagent tous deux une tendance long-terme. Une corrélation calculée sur les niveaux bruts est dominée par cette tendance commune et ne dit rien sur le lien interannuel propre. On construit donc 5 représentations :
+
+  ┌──────────┬───────────────────────────────┬────────────────────────────────────────────────────────────┐
+  │ Repr.    │ Formule                       │ Capture                                                    │
+  ├──────────┼───────────────────────────────┼────────────────────────────────────────────────────────────┤
+  │ level    │ X_t                           │ tendance + saison + interannuel + bruit                    │
+  │ anom     │ X_t − climatologie(month_t)   │ tendance + interannuel + bruit (saison retirée)            │
+  │ resid    │ anom_t − fit_lin(t)           │ interannuel + bruit (KEY pour lien propre)                 │
+  │ d1       │ X_t − X_{t−1}                 │ saisonnalité + bruit blanc                                 │
+  │ d12      │ X_t − X_{t−12}                │ taux d'évolution interannuel                               │
+  └──────────┴───────────────────────────────┴────────────────────────────────────────────────────────────┘
+
+  Sortie : outputs/series_transformed.rds (liste de 5 dataframes 564 × 26)
+  Aussi  : series_level.csv, series_anom.csv, series_resid.csv, series_d1.csv, series_d12.csv
+
+  C. Comparaison des corrélations sur les 5 représentations (06_correlations.R)
+
+  Sur les niveaux bruts, plus de la moitié des variables affichent r > 0.5 avec le CO2 — résultat trompeur dominé par la tendance commune. Sur les résidus (le seul signal interannuel propre), seules 5 variables conservent |r| > 0.3.
+
+  Top 5 corrélations sur résidus (signal interannuel pur, version homogénéisée) :
+
+  ┌──────────┬──────────┬────────────────────────────────────────────────────────────────┐
+  │ Variable │ r (resid)│ Lecture                                                        │
+  ├──────────┼──────────┼────────────────────────────────────────────────────────────────┤
+  │ T2m      │ +0.35    │ Réchauffement en surface lié au forçage CO2                    │
+  │ TCDC     │ −0.27    │ Couverture nuageuse en baisse interannuelle (signal réel)      │
+  │ DLWRF    │ +0.25    │ Effet de serre LW descendant                                   │
+  │ CSULF    │ +0.29    │ LW ascendant ciel clair (T_surface ↑)                         │
+  │ CSDLF    │ +0.30    │ LW descendant ciel clair (signature directe GES)               │
+  └──────────┴──────────┴────────────────────────────────────────────────────────────────┘
+
+  Note : la version brute donnait CRE_LW = −0.52 et CRE_SW = +0.49 en tête. Ces signaux disparaissent après correction du saut CFSR/CFSv2 (phase 3).
+
+  D. Matrice de corrélation sur résidus (heatmap)
+
+  Plot : plots/06a_corr_heatmap.png
+
+  Trois blocs apparaissent :
+  - Variables radiatives all-sky très intercorrélées (DLWRF/ULWRF, DSWRF/USWRF) → multicolinéarité forte qui justifie le lasso.
+  - Variables clear-sky très intercorrélées entre elles mais peu liées aux all-sky (les nuages dominent l'écart).
+  - Le CO2 se corrèle modérément avec PWAT, T2m, T500, CRE_LW. Aucune corrélation > 0.6 sur résidus → pas de variable miracle qui expliquerait à elle seule la variance interannuelle.
+
+  E. Régression multivariée (07_regressions.R)
+
+  Trois approches en parallèle, toutes sur les résidus.
+
+  E.1 Régression complète
+
+  lm(co2_trend_resid ~ T2m + T500 + ... + CRE_net) avec les 21 prédicteurs.
+
+  - Version brute       : R² = 0.750
+  - Version homogénéisée : R² = 0.443
+
+  E.2 Sélection stepwise AIC (backward)
+
+  step(fit_full, direction = "backward") sur la version brute.
+
+  - R² = 0.748 avec 12 variables retenues : T500, PWAT, APCP, TCDC, DSWRF, USWRF, PRMSL, CSUSF, CSDLF, CSULF, DUVB, ALBDO
+  - Plot du fit : plots/07b_stepwise_fit.png — observé / prédit superposés
+  - Plot des résidus : plots/07c_stepwise_residuals.png — léger pattern en U (limite du détendrage linéaire)
+
+  E.3 Lasso avec validation croisée 10-fold (glmnet)
+
+  - lambda.min = 0.0038 (sélectionné par CV)
+  - 18 variables non nulles à lambda.min
+  - Variables qui entrent en premier dans le chemin (les plus importantes) : T500, CSDLF, CSUSF, T2m, CSDSF
+  - Plot : plots/07a_lasso_path.png — coefficients standardisés (β × sd(X)) pour permettre la comparaison entre variables de natures dimensionnelles différentes
+
+  F. Tests de causalité de Granger (08_granger.R)
+
+  Pour chaque variable X :
+  - H0 (X ↛ CO2) : X ne cause pas CO2 au sens de Granger
+  - H0 (CO2 ↛ X) : CO2 ne cause pas X au sens de Granger
+
+  Lag fixé à 6 mois (motivé par la phase 1 : corrélation taux annuel CO2 ↔ ENSO peak à lag 6).
+
+  Test sur deux représentations :
+
+  ┌──────────────┬───────────────────────────────────────┬──────────────────────────────────────────┐
+  │ Représent.   │ Granger X → CO2 significatif (p<0.05) │ Granger CO2 → X significatif             │
+  ├──────────────┼───────────────────────────────────────┼──────────────────────────────────────────┤
+  │ resid        │ 0 / 21 vars (signal trop bruité)      │ 0 / 21                                   │
+  │ d12 (taux)   │ 15 / 21 vars                          │ 8 / 21                                   │
+  └──────────────┴───────────────────────────────────────┴──────────────────────────────────────────┘
+
+  Top 5 Granger X → CO2 sur d12 (les plus significatifs) :
+
+  ┌──────────┬──────────────┐
+  │ Variable │ p-value      │
+  ├──────────┼──────────────┤
+  │ CSDLF    │ 3.00e−9      │
+  │ SPFH2m   │ 6.49e−9      │
+  │ PWAT     │ 1.00e−8      │
+  │ DLWRF    │ 1.16e−8      │
+  │ T500     │ 2.21e−8      │
+  └──────────┴──────────────┘
+
+  Ces 5 variables sont des prédicteurs très significatifs du taux annuel CO2 à 6 mois d'avance.
+
+  Synthèse des sens du lien (sur d12) :
+
+  ┌───────────────────────┬─────┐
+  │ X → CO2 uniquement    │ 10  │
+  │ CO2 → X uniquement    │ 3   │
+  │ Bidirectionnel        │ 5   │
+  │ Aucun                 │ 3   │
+  └───────────────────────┴─────┘
+
+  → Le sens DOMINANT à l'échelle interannuelle est CLIMAT → CO2 : à un délai de 6 mois, les variations de température, vapeur d'eau et flux radiatifs précèdent les variations du taux annuel CO2.
+
+  Mécanisme : climat tropical → photosynthèse / respiration biosphère → flux net atmosphère.
+
+  Cette signature est cohérente avec le résultat ENSO de la phase 1 (corrélation taux annuel CO2 ↔ ONI = +0.28 à lag 6 mois).
+
+  G. Synthèse finale (09_synthese.R)
+
+  Le tableau outputs/synthese_finale.csv consolide pour les 21 variables :
+  - Corrélations sur les 5 représentations
+  - p-values Granger d12 (les deux sens)
+  - Catégorie qualitative (poids fort/modéré/faible) et flag "spurious_trend"
+
+  ┌──────────────────────────────────────────────────────────┬────┐
+  │ Catégorie                                                │ N  │
+  ├──────────────────────────────────────────────────────────┼────┤
+  │ Spurious_trend (fort sur anom, faible sur resid)         │ 10 │
+  │ Variables avec poids fort sur résidus (|r| > 0.4)        │ 5  │
+  │ Variables avec poids modéré sur résidus (0.2 < |r| ≤ 0.4)│ 6  │
+  │ Variables avec poids faible (|r| ≤ 0.2)                  │ 10 │
+  └──────────────────────────────────────────────────────────┴────┘
+
+  H. Conclusions scientifiques majeures
+
+  1. Tendance commune ≠ lien physique. 10 variables sur 21 affichent r > 0.5 sur les niveaux et r < 0.25 sur les résidus → corrélation TROMPEUSE. Le détendrage est obligatoire pour étudier le lien interannuel propre.
+
+  2. R² multivarié = 0.75 sur résidus version brute, 0.44 après homogénéisation. Une partie substantielle du R² brut était un artefact du saut CFSR→CFSv2 (phase 3). La valeur réaliste est ~0.44, soit ~6 prédicteurs explicatifs équivalents. Le lien climat-CO2 reste multivarié et significatif, mais plus modeste qu'il ne paraît avant correction.
+
+  3. Causalité dominante climat → CO2 à 6 mois. Sur les taux annuels (d12), 15 variables sur 21 causent significativement le CO2 (p souvent < 1e−7), contre seulement 8 dans le sens inverse. Le carbon cycle response (réponse de la biosphère et de l'océan aux variations climatiques) précède les variations du CO2 atmosphérique.
+
+  4. Cohérence avec la phase 1. Le lag 6 mois confirme le résultat ENSO observé sur les taux annuels CO2 ↔ ONI dans la phase 1 (r = +0.28 à lag 6).
+
+  5. Signaux climatiques propres robustes : T2m, T500, SPFH2m, PWAT, DLWRF, ULWRF, CSDLF, CSULF, APCP, TCDC. Ces variables conservent une corrélation cohérente après désaisonnement, détendrage et homogénéisation — elles portent un signal climatique réel vis-à-vis du CO2 atmosphérique.
+
+  I. Architecture (scripts utilisés)
+
+  ┌─────────────────────────────────────────┬──────────────────────────────────────────────────┐
+  │                Script                   │                       Rôle                      │
+  ├─────────────────────────────────────────┼──────────────────────────────────────────────────┤
+  │ 05_preparation.R                        │ 5 représentations level/anom/resid/d1/d12       │
+  ├─────────────────────────────────────────┼──────────────────────────────────────────────────┤
+  │ 06_correlations.R                       │ Corrélations + heatmap + analyse en lag         │
+  ├─────────────────────────────────────────┼──────────────────────────────────────────────────┤
+  │ 07_regressions.R                        │ LM complet, stepwise AIC, lasso CV              │
+  ├─────────────────────────────────────────┼──────────────────────────────────────────────────┤
+  │ 08_granger.R                            │ Causalité Granger (resid + d12)                 │
+  ├─────────────────────────────────────────┼──────────────────────────────────────────────────┤
+  │ 09_synthese.R                           │ Tableau de synthèse final + bilan               │
+  └─────────────────────────────────────────┴──────────────────────────────────────────────────┘
+
+  J. Sorties produites
+
+  ┌──────────────────────────────────────────┬─────────────────────────────────────────────────────┐
+  │                 Fichier                  │                       Contenu                       │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ outputs/series_transformed.rds           │ Liste de 5 dataframes (level/anom/resid/d1/d12)     │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ outputs/series_*.csv                     │ Mêmes 5 dataframes en CSV pour inspection           │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ outputs/correlations_4repr.csv           │ Corrélations sur les 5 représentations              │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ outputs/lag_correlations.csv             │ Corrélations vs lag (-12 à +12 mois) top 6 vars     │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ outputs/regression_summary.txt           │ Résumés des modèles complet/stepwise/lasso          │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ outputs/lasso_path.csv                   │ Chemin de régularisation lasso (coefs × λ)          │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ outputs/granger_results.csv              │ Tests Granger (resid + d12) pour les 21 variables   │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ outputs/synthese_finale.csv              │ Tableau master des 21 variables (corrélations + Granger) │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ plots/06a_corr_heatmap.png               │ Matrice de corrélation sur résidus (corrplot)       │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ plots/06b_corr_climat_co2.png            │ Corrélations sur les 5 représentations              │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ plots/06c_lag_correlations.png           │ Lag correlations -12..+12 mois (top 6 vars)         │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ plots/07a_lasso_path.png                 │ Chemin de régularisation Lasso (coefs standardisés) │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ plots/07b_stepwise_fit.png               │ Fit du modèle stepwise sur les résidus              │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ plots/07c_stepwise_residuals.png         │ Résidus du modèle stepwise                          │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ plots/08_granger.png                     │ Tests de causalité Granger (resid + d12)            │
+  ├──────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ plots/09_synthese.png                    │ Synthèse finale : corrélations sur 4 représentations│
+  └──────────────────────────────────────────┴─────────────────────────────────────────────────────┘
+
+  K. Limites et améliorations possibles
+
+  - Le détendrage linéaire laisse une courbure cubique résiduelle qui pénalise le R² (visible en U dans le fit). Un GAM ou polynôme cubique sur le temps comme régresseur de contrôle améliorerait probablement le R².
+
+  - Les moyennes globales sont aveugles aux signaux régionaux dominants (Amazonie, Indonésie, Sibérie). Une analyse à 0.5° × 0.5° par bandes de latitude révélerait probablement des corrélations supérieures sur les régions tropicales.
+
+  - Les tests de Granger ont été menés à un lag fixe de 6 mois ; une analyse multi-lag (1, 3, 6, 12 mois) raffinerait l'identification du délai dominant pour chaque variable.
+
+  - Le passage à 0.5° × 0.5° permettrait des analyses régionales et un découpage par bandes de latitude (boréale, tropicale, australe), ce qui correspondrait mieux à l'asymétrie hémisphérique observée en phase 1 (ratio MLO/SPO = 5.6×).
+
+  - L'homogénéisation CFSR/CFSv2 suppose un saut instantané et constant ; une approche plus fine (interaction step × month, ou référence externe ERA5) pourrait améliorer la qualité du signal.
+
+  L. Liens vers les phases voisines
+
+  - Phase 1 (CO2)                       : voir Analyse CO2/notes/Récapitulatif détaillé — Analyse CO2.txt
+  - Phase 2 (extraction climat)         : voir notes/Phase 2.txt
+  - Phase 3 (robustesse CFSR/CFSv2)     : voir notes/Phase 3.txt

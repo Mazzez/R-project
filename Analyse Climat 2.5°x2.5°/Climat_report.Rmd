@@ -1,0 +1,659 @@
+---
+title: "Analyse climat ↔ CO2 mondial"
+subtitle: "Phases 2-4 — Extraction GRIB2, robustesse et corrélations climat / CO2"
+author: "Mazzez Mohamed Amine"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    code_folding: show
+    theme: flatly
+    highlight: tango
+    fig_width: 11
+    fig_height: 6
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo      = TRUE,
+  message   = FALSE,
+  warning   = FALSE,
+  cache     = TRUE,
+  fig.align = "center",
+  dpi       = 110
+)
+
+suppressPackageStartupMessages({
+  library(dplyr); library(tidyr); library(ggplot2); library(scales)
+  library(corrplot); library(glmnet); library(lmtest)
+})
+
+OUT_DIR <- "/home/mazzez/Bureau/R project/Final Version/Analyse Climat 2.5°x2.5°/outputs"
+PLOT    <- file.path(OUT_DIR, "plots")
+theme_set(theme_minimal(base_size = 12))
+```
+
+# Introduction
+
+Ce rapport documente la **seconde moitié** du projet R Climat & CO2. La première phase (rapport `CO2_final_report.html`) a établi les caractéristiques statistiques de la concentration atmosphérique globale de CO2 (NOAA GML, 1979-2025) : hausse de +91 ppm (Sen = 1.88 ppm/an), accélération non-linéaire, cycle saisonnier dominé par l'hémisphère nord, modulation ENSO avec lag 6 mois.
+
+Cette seconde moitié construit le pendant climatique. À partir des **réanalyses NCAR CFSR (1979-2010) et CFSv2 (2011-2025)** à la résolution 2.5° × 2.5°, on extrait **18 variables climatiques globales** sur 564 mois et on étudie leur relation avec le CO2.
+
+Trois questions guident l'analyse :
+
+1. La trajectoire du CO2 et celle des variables climatiques sont-elles **statistiquement liées au-delà de leur tendance commune** ?
+2. Si oui, quelles variables expliquent le mieux la **variance interannuelle** du CO2 ?
+3. Le sens du lien est-il **climat → CO2** (carbon cycle response) ou **CO2 → climat** (forçage radiatif direct) à l'échelle de quelques mois à quelques années ?
+
+# Données mobilisées
+
+| Dataset | Source | Fichier | Période | Granularité |
+|---|---|---|---|---|
+| Réanalyses CFSR | NSF-NCAR (`d093002`) | `pgbl04.gdas.YYYY.tar` → `pgbl04.gdas.YYYYMM.grb2` | 1979-01 → 2010-12 | mensuel, 2.5° × 2.5° |
+| Réanalyses CFSv2 | NSF-NCAR (`d094002`) | `pgbl.gdas.YYYYMM.tar` → `pgbl04.gdas.YYYYMM.grib2` | 2011-01 → 2025-12 | mensuel, 2.5° × 2.5° |
+| CO2 mondial | NOAA GML | `co2_mm_gl.csv` | 1979-01 → 2025-12 | mensuel global |
+
+Les fichiers GRIB2 mensuels contiennent **630 records** (variables × niveaux). On a sélectionné **18 records utiles** par mois et converti en NetCDF pour exploitation R.
+
+## Variables retenues
+
+```{r vars-table, echo=FALSE}
+vars_tbl <- tribble(
+  ~`#`, ~Code, ~Niveau, ~Famille, ~Justification,
+  1, "T2m", "2 m", "Thermo air", "Variable canonique du réchauffement global",
+  2, "T500", "500 hPa", "Thermo mid-tropo", "Standard climato moins bruité",
+  3, "SPFH2m", "2 m", "Humidité", "Vapeur d'eau (Clausius-Clapeyron, feedback)",
+  4, "PWAT", "colonne", "Humidité", "Eau précipitable intégrée",
+  5, "APCP", "surface", "Cycle hydro", "Précipitations cumulées",
+  6, "TCDC", "colonne", "Nuages", "Couverture nuageuse totale (incertitude majeure)",
+  7, "DLWRF", "surface", "Radiatif LW", "IR descendant — mesure directe effet de serre",
+  8, "ULWRF", "surface", "Radiatif LW", "IR ascendant",
+  9, "DSWRF", "surface", "Radiatif SW", "Solaire descendant",
+  10, "PRMSL", "MSL", "Dynamique", "Pression réduite — circulation",
+  11, "USWRF", "surface", "Radiatif SW", "Solaire réfléchi",
+  12, "CSDSF", "surface", "Clear-sky SW", "Pour CRE_SW",
+  13, "CSUSF", "surface", "Clear-sky SW", "Pour CRE_SW",
+  14, "CSDLF", "surface", "Clear-sky LW", "Pour CRE_LW",
+  15, "CSULF", "surface", "Clear-sky LW", "Pour CRE_LW",
+  16, "CDUVB", "surface", "Clear-sky UV", "UV-B ciel clair",
+  17, "DUVB", "surface", "All-sky UV", "UV-B all-sky",
+  18, "ALBDO", "surface", "Albédo", "Test global dimming/brightening"
+)
+knitr::kable(vars_tbl, caption = "Les 18 variables extraites")
+```
+
+L'inclusion des **clear-sky** ainsi que des all-sky permet de calculer les **Cloud Radiative Effects** (CRE), qui isolent l'effet propre des nuages :
+
+- $\mathrm{CRE_{SW}} = (\mathrm{DSWRF} - \mathrm{USWRF}) - (\mathrm{CSDSF} - \mathrm{CSUSF})$
+- $\mathrm{CRE_{LW}} = (\mathrm{DLWRF} - \mathrm{ULWRF}) - (\mathrm{CSDLF} - \mathrm{CSULF})$
+- $\mathrm{CRE_{net}} = \mathrm{CRE_{SW}} + \mathrm{CRE_{LW}}$
+
+# Phase 2 — Extraction et moyennes globales
+
+## Pipeline en 4 étapes
+
+1. **Extraction** : pour chaque fichier GRIB2 mensuel, `wgrib2 -match` filtre les 18 records utiles, puis `-set_date / -set_ftime` harmonise les estampilles temporelles, puis `-netcdf` convertit en NetCDF léger (~ 1.5 Mo / mois). Total : 564 NetCDF, ~ 850 Mo.
+2. **Moyennes globales pondérées cos(lat)** : pour chaque variable et chaque mois, on calcule $\bar{X} = \sum_{i,j} w_j X_{ij} / \sum_{i,j} w_j$ où $w_j = \cos(\phi_j)$ et $\phi_j$ est la latitude. Sans pondération, T2m globale serait biaisée de plusieurs K (les pôles sont sur-pondérés sur une grille équirectangulaire).
+3. **Validation** : sanity checks par plage climatologique attendue, plots des 18 séries, calcul des CRE.
+4. **Fusion CO2** : jointure sur (année, mois) avec `co2_mm_gl.csv`.
+
+## Vérifications de sanity (18/18 OK)
+
+```{r sanity-check}
+clim <- read.csv(file.path(OUT_DIR, "monthly_global_means_25.csv")) |>
+  mutate(date = as.Date(date))
+
+vars <- c("T2m","T500","SPFH2m","PWAT","APCP","TCDC",
+          "DLWRF","ULWRF","DSWRF","USWRF","PRMSL",
+          "CSDSF","CSUSF","CSDLF","CSULF","CDUVB","DUVB","ALBDO")
+
+stats <- clim |>
+  pivot_longer(all_of(vars), names_to = "var", values_to = "value") |>
+  group_by(var) |>
+  summarise(min = min(value), mean = mean(value),
+            max = max(value), sd = sd(value), .groups = "drop")
+knitr::kable(stats, digits = 3,
+             caption = "Moyennes globales des 18 variables (1979-2025)")
+```
+
+**Interprétation.** Toutes les moyennes globales sont dans leurs fourchettes climatologiques de référence : T2m ≈ 288 K (15 °C), PWAT ≈ 25 kg/m², DLWRF ≈ 341 W/m², TCDC ≈ 60 %, ALBDO ≈ 10.5 %, PRMSL ≈ 1011 hPa. La pondération cos(lat) fonctionne correctement (sans elle, T2m sortirait à ~280 K à cause de la sur-pondération polaire).
+
+## Séries temporelles brutes
+
+```{r series-plot, fig.width=14, fig.height=10}
+clim |>
+  pivot_longer(all_of(vars), names_to = "var", values_to = "value") |>
+  mutate(var = factor(var, levels = vars)) |>
+  ggplot(aes(date, value)) +
+  geom_line(color = "steelblue") +
+  facet_wrap(~ var, scales = "free_y", ncol = 4) +
+  labs(title    = "Moyennes globales mensuelles pondérées cos(lat) — 18 variables",
+       subtitle = "1979-01 → 2025-12 (résolution 2.5° × 2.5°)",
+       x = NULL, y = NULL)
+```
+
+**Interprétation.** Toutes les séries présentent un **cycle saisonnier net** d'origine astronomique (ensoleillement hémisphère nord) ; les variables thermo et hydrologiques (T2m, PWAT) montrent une trend ascendante claire ; la TCDC montre un saut algorithmique en 2011 (transition CFSR → CFSv2) à surveiller. Les variables clear-sky (CSDSF, CSDLF…) sont quasi stationnaires car elles ne dépendent pas des nuages — leur évolution reflète juste la géométrie solaire et la trend du forçage radiatif net.
+
+## Cloud Radiative Effects
+
+```{r cre, fig.width=10, fig.height=8}
+df <- read.csv(file.path(OUT_DIR, "climate_co2_monthly.csv")) |>
+  mutate(date = as.Date(date))
+
+cre <- df |>
+  mutate(CRE_SW  = (DSWRF - USWRF) - (CSDSF - CSUSF),
+         CRE_LW  = (DLWRF - ULWRF) - (CSDLF - CSULF),
+         CRE_net = CRE_SW + CRE_LW)
+
+cat(sprintf("CRE_SW  moyen : %6.2f W/m²\n", mean(cre$CRE_SW)))
+cat(sprintf("CRE_LW  moyen : %6.2f W/m²\n", mean(cre$CRE_LW)))
+cat(sprintf("CRE_net moyen : %6.2f W/m²\n", mean(cre$CRE_net)))
+
+cre |>
+  pivot_longer(c(CRE_SW, CRE_LW, CRE_net),
+               names_to = "component", values_to = "value") |>
+  mutate(component = factor(component,
+                            levels = c("CRE_SW","CRE_LW","CRE_net"))) |>
+  ggplot(aes(date, value, color = component)) +
+  geom_line(linewidth = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
+  facet_wrap(~ component, ncol = 1, scales = "free_y") +
+  scale_color_manual(values = c("CRE_SW" = "steelblue",
+                                "CRE_LW" = "tomato",
+                                "CRE_net" = "purple")) +
+  labs(title = "Cloud Radiative Effects à la surface",
+       x = NULL, y = "W/m²", color = NULL)
+```
+
+**Interprétation.** Les nuages refroidissent la planète de **−19.7 W/m²** en moyenne globale (réflexion SW = −45 W/m² > effet de serre LW = +25 W/m²). Cette valeur est **strictement conforme au consensus IPCC** (~−20 W/m²), ce qui valide indirectement la qualité de l'extraction et de la pondération.
+
+# Phase 2 bis — Analyse détaillée par variable
+
+Cette section approfondit l'examen de chacune des 21 variables prises individuellement. Pour chaque variable on examine sa série temporelle complète, sa décomposition saisonnière, sa climatologie mensuelle, et la heatmap mois × année des anomalies.
+
+## Vue d'ensemble — vitesses d'évolution
+
+```{r trends-table, echo=FALSE}
+trends <- read.csv(file.path(OUT_DIR, "trends_summary.csv"))
+knitr::kable(trends |>
+  mutate(across(where(is.numeric), ~ signif(.x, 4))) |>
+  arrange(desc(abs(pct_change_47y))),
+  caption = "Pente Sen annualisée, IC bootstrap 95%, et changement total sur 47 ans (en %)")
+```
+
+```{r trends-sen, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "11a_trends_sen.png"))
+```
+
+```{r trends-sig, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "11b_trends_significance.png"))
+```
+
+**Interprétation.** Sur les 21 variables, **16 ont une tendance Mann-Kendall significative** (p < 0.05). Top 5 des vitesses normalisées en %/an :
+
+- **PWAT** (+0.21 %/an, soit +9.9 % sur 47 ans) — humidification de l'atmosphère, conforme à Clausius-Clapeyron
+- **TCDC** (+0.19 %/an, soit +9.1 %) — augmentation de la couverture nuageuse, en partie biaisée par le saut CFSR→CFSv2
+- **CRE_LW** (−0.19 %/an, soit −8.9 %) — diminution de l'effet de serre nuageux LW
+- **CRE_SW** (−0.17 %/an, soit −7.9 %) — diminution du refroidissement nuageux SW (les nuages réfléchissent moins)
+- **APCP** (+0.15 %/an, soit +6.9 %) — intensification du cycle hydrologique
+
+Les **flux radiatifs clear-sky (CSDSF, CSDLF, CSUSF, CSULF)** évoluent peu en pourcentage, mais en valeur absolue **CSDLF gagne +7.8 W/m² sur 47 ans** (+2.5 %), ce qui traduit directement le forçage radiatif additionnel par les gaz à effet de serre dans une atmosphère sans nuages. **PRMSL et ALBDO ne montrent pas de tendance significative**.
+
+**Vitesse de la T2m globale** : +0.27 %/an × 47 ans / 100 × 287 K = **+0.27 K/47 ans** apparente, mais en réalité la pente Sen donne **+0.0166 K/an = +0.78 K sur 47 ans** — proche du consensus GIEC de ~+0.9 K depuis 1979.
+
+## Heatmaps comparatives mois × année
+
+```{r grid-heat, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "11c_grid_heatmaps.png"))
+```
+
+**Interprétation.** Cette grille révèle d'un coup d'œil le **réchauffement progressif** : sur T2m, T500, SPFH2m, PWAT, DLWRF, ULWRF, CSDLF, CSULF, le bas du panneau (années 2015-2025) est dominé par le rouge alors que le haut (1979-1985) est dominé par le bleu. Pour CRE_SW et CRE_LW c'est **l'inverse** (perte d'effet refroidissant et réchauffant des nuages). USWRF et CSUSF montrent peu de structure, en cohérence avec leur faible variabilité spatiale moyenne.
+
+## Composantes de tendance STL
+
+```{r grid-stl, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "11d_grid_stl_trends.png"))
+```
+
+**Interprétation.** Les courbes rouges (trend STL) confirment quantitativement le bilan : **monotone ascendante** pour les variables hydrologiques et de flux LW (T2m, T500, SPFH2m, PWAT, APCP, DLWRF, ULWRF, CSDLF, CSULF, DSWRF, USWRF, DUVB, CDUVB, TCDC) ; **monotone descendante** pour CRE_LW et CRE_net ; **stationnaire** pour PRMSL, ALBDO, CSDSF, CSUSF.
+
+## Fiches individuelles
+
+```{r per-var-fiches, echo=FALSE, results='asis'}
+all_vars <- c(
+  "T2m","T500","SPFH2m","PWAT","APCP","TCDC",
+  "DLWRF","ULWRF","DSWRF","USWRF","PRMSL",
+  "CSDSF","CSUSF","CSDLF","CSULF","CDUVB","DUVB","ALBDO",
+  "CRE_SW","CRE_LW","CRE_net"
+)
+META <- tibble::tribble(
+  ~code,     ~long,
+  "T2m",     "Température air 2 m",
+  "T500",    "Température 500 hPa",
+  "SPFH2m",  "Humidité spécifique 2 m",
+  "PWAT",    "Eau précipitable colonne",
+  "APCP",    "Précipitations cumulées",
+  "TCDC",    "Couverture nuageuse totale",
+  "DLWRF",   "LW descendant surface",
+  "ULWRF",   "LW ascendant surface",
+  "DSWRF",   "SW descendant surface",
+  "USWRF",   "SW réfléchi surface",
+  "PRMSL",   "Pression réduite mer",
+  "CSDSF",   "SW descendant ciel clair",
+  "CSUSF",   "SW ascendant ciel clair",
+  "CSDLF",   "LW descendant ciel clair",
+  "CSULF",   "LW ascendant ciel clair",
+  "CDUVB",   "UV-B ciel clair",
+  "DUVB",    "UV-B all-sky",
+  "ALBDO",   "Albédo de surface",
+  "CRE_SW",  "Cloud Radiative Effect SW",
+  "CRE_LW",  "Cloud Radiative Effect LW",
+  "CRE_net", "Cloud Radiative Effect net"
+)
+trends <- read.csv(file.path(OUT_DIR, "trends_summary.csv"))
+PV <- file.path(OUT_DIR, "per_variable")
+
+for (v in all_vars) {
+  long  <- META$long[META$code == v]
+  st    <- trends[trends$var == v, ]
+
+  cat(sprintf("\n### %s — %s\n\n", v, long))
+
+  cat(sprintf(
+    paste0("**Tendance Sen** : %+.4g / an (IC 95 %% bootstrap : [%.4g ; %.4g])  \n",
+           "**Mann-Kendall**  : tau = %.3f, p = %.3g  \n",
+           "**Évolution sur 47 ans** : %+.2f %% de la moyenne (%.4g)\n\n"),
+    st$sen_per_year, st$sen_lo95, st$sen_hi95,
+    st$mk_tau, st$mk_pvalue,
+    st$pct_change_47y, st$mean
+  ))
+
+  for (img in c("01_timeseries_loess.png", "02_stl_decomposition.png",
+                "03_seasonal_climato.png", "04_heatmap_anomaly.png")) {
+    f <- file.path(PV, v, img)
+    if (file.exists(f)) {
+      cat(sprintf("![](%s)\n\n", f))
+    }
+  }
+}
+```
+
+# Phase 3 — Robustesse à l'homogénéisation CFSR / CFSv2
+
+L'œil non averti, en regardant les courbes brutes des 21 variables, a remarqué qu'**un saut visible apparaît au passage 2010 / 2011** sur de nombreuses séries — ce qui correspond à la transition entre les deux produits NCAR : **CFSR (1979-2010, fichiers `.grb2`)** et **CFSv2 (2011-2025, fichiers `.grib2`)**. Ces deux réanalyses utilisent des modèles atmosphériques, des assimilations et des paramétrisations légèrement différentes, ce qui peut introduire un **biais de niveau** au moment de la transition.
+
+Avant d'attribuer ce saut à un changement physique, il faut **vérifier qu'on extrait bien la même quantité physique dans les deux périodes**. Si l'extraction `wgrib2 -match` sélectionnait par erreur des records différents avant et après 2011, on créerait nous-mêmes l'artefact.
+
+## Vérification : mêmes codes GRIB2 dans CFSR et CFSv2
+
+Chaque record GRIB2 porte un identifiant complet de la forme `var<discipline>_<table>_<…>_<category>_<param>` qui pointe vers une entrée précise de la table de paramètres NCEP. Si deux fichiers retournent le même identifiant pour une variable donnée, c'est la **preuve** que le record extrait est physiquement le même.
+
+```{r grib-verification, echo=FALSE}
+gv <- read.csv(file.path(OUT_DIR, "grib_codes_verification.csv"),
+               check.names = FALSE)
+knitr::kable(gv,
+             caption = "Codes paramètre GRIB2 sur 4 fichiers témoins (1979, 2000, 2011, 2024)")
+n_match <- sum(gv$all_match == "YES")
+cat(sprintf("\n**%d / %d records ont des codes GRIB2 identiques sur tous les fichiers témoins.**\n",
+            n_match, nrow(gv)))
+```
+
+**Interprétation.** Les 18 records sélectionnés portent **exactement les mêmes codes paramètre** dans CFSR (1979 et 2000) et CFSv2 (2011 et 2024). Par exemple, TMP@500mb est partout `var0_2_1_7_0_0`, TCDC@colonne est partout `var0_2_1_7_6_1`, CSDLF@surface est partout `var0_2_1_7_5_196`. **Le saut observé au passage 2010/2011 ne provient donc PAS d'une erreur de sélection de variable** : nous lisons bien la même quantité physique des deux côtés. Le saut traduit un changement réel dans le modèle atmosphérique, l'assimilation ou la paramétrisation entre CFSR et CFSv2 — différences documentées par NCEP, particulièrement marquées pour les nuages et le rayonnement net.
+
+Cette section quantifie ce saut, construit une version **homogénéisée** des séries (saut retiré), et vérifie l'**impact attendu sur les corrélations climat ↔ CO2** qui seront étudiées dans la phase 4 (le présent rapport effectue d'abord la correction du saut, puis la phase 4 utilise la version homogénéisée).
+
+## Modèle de détection du saut
+
+Pour chaque variable on ajuste :
+
+$$X_t = a + b\,t + c\,\mathbf{1}\{t \geq 2011\text{-}01\} + \sum_{m=1}^{12} s_m \mathbf{1}\{\text{month}(t)=m\} + \varepsilon_t$$
+
+- $b$ capture la **tendance climatique linéaire** sous-jacente.
+- $c$ capture le **saut instantané** au moment de la transition.
+- Le bloc $s_m$ retire la **saisonnalité** (mois en facteur).
+
+Le coefficient $c$ et son IC nous donnent le saut estimé (p-value du test t).
+
+```{r jumps-table, echo=FALSE}
+J <- read.csv(file.path(OUT_DIR, "cfsr_to_cfsv2_jumps.csv")) |>
+  arrange(desc(abs(jump_in_sd))) |>
+  mutate(across(where(is.numeric), ~ signif(.x, 3)))
+knitr::kable(J |> select(var, jump, jump_pct, jump_in_sd, p_value, significant),
+             caption = "Saut estimé CFSR → CFSv2 par variable, ordonné par magnitude (en sd)")
+```
+
+```{r jumps-bar, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "12a_jumps_bar.png"))
+```
+
+**Interprétation.** **17 variables sur 21 ont un saut statistiquement significatif** (p < 0.05). Cinq variables présentent un saut massif :
+
+| Variable | Saut | Magnitude | Lecture |
+|---|---|---|---|
+| **CRE_LW** | −2.04 W/m² | −1.92 sd | énorme baisse de l'effet de serre nuageux |
+| **PRMSL** | −26 Pa | −1.77 sd | déplacement du champ de pression global |
+| **CRE_SW** | +5.14 W/m² | +1.56 sd | les nuages réfléchissent moins selon CFSv2 |
+| **TCDC** | +2.63 % | +1.14 sd | plus de couverture nuageuse selon CFSv2 |
+| **CRE_net** | +3.10 W/m² | +1.13 sd | conséquence des deux précédents |
+
+Variables peu touchées (p > 0.05 ou |saut| < 0.1 sd) : **APCP, CSUSF, T500, PWAT** — ces séries traversent la transition sans rupture, donc leurs analyses de phase 4 sont robustes telles quelles.
+
+## Avant / après homogénéisation
+
+```{r before-after, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "12b_before_after.png"))
+```
+
+**Interprétation.** Sur les 4 variables les plus impactées (CRE_LW, CRE_SW, PRMSL, TCDC), la version brute (bleu) montre clairement un **palier visuel** au passage de la ligne pointillée rouge ; la version homogénéisée (rouge) supprime ce palier et donne une trajectoire continue, plus fidèle au signal climatique sous-jacent.
+
+## Impact sur la phase 4 — corrélations climat ↔ CO2
+
+```{r correlation-comparison, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "13a_correlations_homog_vs_brut.png"))
+```
+
+```{r r2-comparison, echo=FALSE, out.width="80%"}
+knitr::include_graphics(file.path(PLOT, "13b_R2_homog_vs_brut.png"))
+```
+
+**Interprétation.** Le résultat est **spectaculaire** :
+
+- **R² du modèle multivarié sur résidus chute de 0.75 (brute) à 0.44 (homogénéisée).** Près d'un tiers de la variance explicative était portée par le saut artificiel CFSR/CFSv2.
+- Les variables qui semblaient les plus corrélées au CO2 sur la version brute — **CRE_SW (r=0.49), CRE_LW (−0.52), DSWRF (0.44), CRE_net (0.43), PRMSL (−0.39)** — voient leurs corrélations **chuter à quasi 0 sur la version homogénéisée**. Leur lien apparent au CO2 venait donc essentiellement du saut, pas d'une relation physique.
+- À l'inverse, **T2m et DLWRF voient leur corrélation augmenter** après homogénéisation (T2m : 0.23 → 0.35 ; DLWRF : −0.06 → +0.25, changement de signe). Ces variables avaient leur signal réel de "réchauffement → effet de serre" partiellement masqué par le saut artificiel.
+- Les variables sur la diagonale (PWAT, T500, SPFH2m, CSDLF, ULWRF, CSULF) — corrélations stables avant/après — sont des **signaux climatiques robustes** indépendants de l'artefact.
+
+## Conséquences pour les conclusions
+
+Cette analyse de robustesse aura un impact significatif sur les conclusions de la phase 4 :
+
+1. Les **CRE et flux radiatifs all-sky (DSWRF, CRE_SW, CRE_LW, CRE_net)** ne sont **pas des signaux interannuels propres** vis-à-vis du CO2 dans cette analyse. Leur lien apparent était un artefact technique de la transition CFSR/CFSv2.
+
+2. Les **vrais signaux interannuels propres** (corrélations stables ou renforcées par homogénéisation) sont :
+   - **T2m, DLWRF, ULWRF, CSULF, CSDLF** (signature directe de l'effet de serre)
+   - **SPFH2m, PWAT, T500** (réservoir d'humidité atmosphérique, Clausius-Clapeyron)
+   - **APCP** (cycle hydrologique intensifié)
+   - **TCDC** (paradoxalement, sa corrélation devient *plus négative* après homogénéisation : −0.27)
+
+3. **R² multivarié réaliste : ~0.44 sur résidus**, soit ~6 prédicteurs explicatifs équivalents (au lieu des 12 retenus sur la version brute). Le lien climat-CO2 reste **multivarié et significatif**, mais d'amplitude plus modeste qu'il n'y paraissait avant correction.
+
+# Phase 4 — Lien climat ↔ CO2
+
+> **L'enjeu de la phase 4 en une phrase.** On veut savoir si, *au-delà du fait que CO2 et climat montent ensemble depuis 1979*, leurs **petites variations d'une année à l'autre** sont liées — et si oui, dans quel sens : est-ce le climat qui fait bouger le CO2, ou le CO2 qui fait bouger le climat ?
+
+Trois questions guident le travail :
+
+1. **Lien réel ou trompeur ?** La trajectoire du CO2 et celle des variables climatiques sont-elles liées **au-delà de leur hausse commune** depuis 1979 ?
+2. **Quelles variables comptent ?** Si oui, lesquelles expliquent le mieux les **variations d'une année à l'autre** du CO2 ?
+3. **Qui pilote qui ?** Le sens est-il **climat → CO2** (la nature absorbe/relâche plus de CO2 selon la météo) ou **CO2 → climat** (l'effet de serre direct) à l'échelle de quelques mois à quelques années ?
+
+## Préparation : pourquoi on ne peut pas comparer les courbes brutes
+
+> **Analogie.** Imaginez deux ascenseurs qui montent en même temps. Vous concluez qu'ils sont *liés* parce qu'ils montent ensemble — mais ils peuvent très bien fonctionner indépendamment, simplement actionnés par deux personnes différentes. Pour savoir si l'un commande l'autre, il faut **retirer le mouvement de montée commun** et regarder uniquement les **petits écarts** : si l'un ralentit, est-ce que l'autre ralentit aussi quelques secondes après ?
+
+C'est exactement ce qu'on fait avec le climat et le CO2. Tous deux montent depuis 1979. Une corrélation calculée sur les courbes brutes serait **automatiquement très élevée**, mais cela ne prouverait rien sur leur lien réel. On construit donc 5 façons différentes de regarder les données :
+
+```{r prep-table, echo=FALSE}
+prep_tbl <- tribble(
+  ~`Représentation`, ~`Comment on l'obtient`, ~`Ce qu'on garde`,
+  "level (brut)",        "On garde la série telle quelle",                  "Tout : tendance + saisons + variations annuelles + bruit",
+  "anom (anomalie)",     "On retire la moyenne du mois (janvier, février…)","Tendance + variations annuelles + bruit",
+  "resid (résidu)",      "Anomalie − droite de tendance",                   "Variations annuelles + bruit (LA bonne représentation)",
+  "d1 (mois sur mois)",  "Valeur du mois − valeur du mois précédent",       "Saisons + bruit",
+  "d12 (an sur an)",     "Valeur du mois − même mois l'an dernier",         "Taux de variation d'une année à l'autre"
+)
+knitr::kable(prep_tbl, caption = "Les 5 manières de regarder une série")
+```
+
+> **À retenir.** La représentation **« résidu »** est celle qui isole les vraies variations d'une année à l'autre, **débarrassées du fait que tout monte ensemble**. C'est sur elle que les corrélations ont un vrai sens physique.
+
+## La grande comparaison : avant/après retrait de la tendance commune
+
+```{r corr-bars, fig.width=11, fig.height=8}
+cor4 <- read.csv(file.path(OUT_DIR, "correlations_4repr.csv"))
+
+cor_long <- cor4 |>
+  pivot_longer(c(level, anom, resid, d1, d12),
+               names_to = "repr", values_to = "r") |>
+  mutate(repr = factor(repr, levels = c("level","anom","resid","d1","d12")),
+         var  = factor(var, levels = cor4$var))
+
+ggplot(cor_long, aes(var, r, fill = repr)) +
+  geom_col(position = position_dodge(0.85), width = 0.8) +
+  geom_hline(yintercept = 0, linewidth = 0.4) +
+  scale_fill_brewer(palette = "Set1") +
+  coord_flip() +
+  labs(title    = "Corrélations climat ↔ CO2 — 5 représentations",
+       subtitle = "level/anom/resid : vs co2_trend  |  d1/d12 : vs Δco2",
+       x = NULL, y = "r (Pearson)", fill = NULL) +
+  theme(legend.position = "bottom")
+```
+
+**Comment lire ce graphique.** Chaque variable a 5 barres de couleurs différentes — une par représentation. **Plus la barre est longue, plus la variable et le CO2 « bougent ensemble »**. La couleur rouge (level, brut) est presque toujours la plus longue : c'est l'illusion de la tendance commune. La couleur **verte (résidu)** montre le **vrai lien**.
+
+**Le résultat est spectaculaire.** Prenons T2m : la corrélation passe de **r = 0.80** sur les données brutes à **r = 0.23 seulement** une fois la tendance commune retirée. **Plus de la moitié des 21 variables (10/21) perdent quasiment tout leur lien apparent au CO2** — c'était une illusion statistique. Sur le « vrai signal » (les résidus), seules **5 variables** conservent une corrélation notable (|r| > 0.3).
+
+> **À retenir.** Sans cette correction, on aurait conclu à tort que presque tout est fortement lié au CO2. En réalité, **la plupart des liens sont des coïncidences de tendance**, pas des relations physiques.
+
+## La carte des liens entre variables
+
+```{r heatmap, fig.width=10, fig.height=10}
+ds <- readRDS(file.path(OUT_DIR, "series_transformed.rds"))
+clim_vars <- c("T2m","T500","SPFH2m","PWAT","APCP","TCDC",
+               "DLWRF","ULWRF","DSWRF","USWRF","PRMSL",
+               "CSDSF","CSUSF","CSDLF","CSULF","CDUVB","DUVB","ALBDO",
+               "CRE_SW","CRE_LW","CRE_net")
+all_vars <- c("co2_trend", clim_vars)
+M <- cor(ds$resid[, all_vars], use = "complete.obs")
+corrplot(M, method = "color", type = "lower",
+         tl.col = "black", tl.cex = 0.7,
+         addCoef.col = "black", number.cex = 0.5,
+         col = colorRampPalette(c("steelblue","white","tomato"))(200))
+```
+
+**Comment lire cette carte.** Chaque case montre le lien entre deux variables : **rouge = elles montent ensemble**, **bleu = quand l'une monte l'autre baisse**, **blanc = pas de lien**. Plus la couleur est intense, plus le lien est fort.
+
+**Ce qu'on observe.** Trois groupes se dessinent clairement :
+
+- **Les variables radiatives all-sky** (DLWRF, ULWRF, DSWRF, USWRF) sont fortement reliées entre elles — c'est attendu : elles décrivent la même chose vue sous des angles différents. Cette **redondance** posera problème pour la régression (deux variables qui disent la même chose se « volent » mutuellement leur poids statistique).
+- **Les variables ciel-clair** (CSDLF, CSULF, CSDSF, CSUSF) forment leur propre cluster, peu lié aux all-sky : les nuages font la différence entre les deux familles.
+- **Le CO2** est dans la première ligne/colonne — il est **modérément lié** à PWAT (humidité), T2m, T500 et CRE_LW, mais **aucun lien ne dépasse 0.6**. Pas de variable « miracle » qui expliquerait à elle seule le CO2.
+
+> **À retenir.** Le lien climat-CO2 est **partagé entre plusieurs variables** plutôt que porté par une seule. C'est pourquoi on passe maintenant à un modèle qui combine toutes les variables ensemble.
+
+## Combiner toutes les variables : régression multivariée
+
+> **Analogie.** Une corrélation simple, c'est demander à chaque variable séparément : « combien tu expliques du CO2 ? ». Une régression multivariée, c'est les faire **travailler en équipe** et demander : « ensemble, combien expliquent-elles ? ». Souvent l'équipe explique bien plus que la somme des contributions individuelles.
+
+```{r regression}
+X <- ds$resid[, clim_vars]
+y <- ds$resid$co2_trend
+fit_full <- lm(y ~ ., data = X)
+fit_step <- step(fit_full, direction = "backward", trace = 0)
+cat("R² du modèle complet  :", round(summary(fit_full)$r.squared, 3), "\n")
+cat("R² du modèle stepwise :", round(summary(fit_step)$r.squared, 3), "\n")
+cat("Variables retenues   :",
+    paste(setdiff(names(coef(fit_step)), "(Intercept)"), collapse = ", "), "\n")
+
+# Plot du fit
+diag_df <- data.frame(date = ds$resid$date, fitted = predict(fit_step), observed = y)
+ggplot(diag_df, aes(date)) +
+  geom_line(aes(y = observed, color = "Observé"),  linewidth = 0.6) +
+  geom_line(aes(y = fitted,   color = "Prédit"),   linewidth = 0.6) +
+  scale_color_manual(values = c("Observé" = "steelblue", "Prédit" = "tomato")) +
+  labs(title    = sprintf("Modèle stepwise — R² = %.3f",
+                          summary(fit_step)$r.squared),
+       subtitle = "y = co2_trend résiduel (anomalie désaisonnée et détendrée linéairement)",
+       x = NULL, y = "ppm", color = NULL)
+```
+
+**Comment lire ce graphique.** La courbe **bleue** est ce qu'on observe (les vraies variations annuelles du CO2). La courbe **rouge** est ce que prédit notre modèle climatique. Plus elles se superposent, plus le climat « explique » le CO2.
+
+**Le résultat.** Avec **12 variables retenues automatiquement** par l'algorithme stepwise (qui ne garde que les plus utiles), on obtient **R² = 0.748** — autrement dit, **le climat explique environ 75 % des variations annuelles du CO2**.
+
+C'est énorme comparé à la meilleure corrélation à 1 variable (r² = 0.27, soit 27 %). **Le tout vaut plus que la somme des parties.**
+
+> **À retenir.** Le lien climat ↔ CO2 existe bien — il est juste **distribué sur une douzaine de variables**, pas concentré sur une seule. Note : un cinquième de variance reste inexpliquée. Cela correspond à un léger « U » résiduel dans la courbe : le CO2 monte de façon **cubique** (de plus en plus vite) alors que notre redressement est linéaire — il en reste une légère courbure que le climat seul ne capture pas.
+
+## Trier les variables vraiment utiles : le lasso
+
+> **Analogie.** Quand 21 variables se chevauchent, beaucoup disent la même chose (deux thermomètres dans la même pièce mesurent la même température). Le lasso est une méthode qui **met automatiquement à zéro les variables redondantes** et ne garde que les indispensables. À la fin on obtient un **palmarès** : voici les variables qu'il faut vraiment regarder, par ordre d'importance.
+
+```{r lasso, fig.width=11, fig.height=7}
+set.seed(42)
+Xm <- as.matrix(X)
+cv <- cv.glmnet(Xm, y, alpha = 1, nfolds = 10, standardize = TRUE)
+
+# Coefficients au lambda optimal (validation croisée 10-fold), rescalés par sd(X)
+# pour les rendre comparables entre variables de natures dimensionnelles différentes.
+coefs_min <- as.numeric(coef(cv, s = "lambda.min"))[-1]
+names(coefs_min) <- colnames(Xm)
+sd_X      <- apply(Xm, 2, sd)
+coefs_std <- coefs_min * sd_X
+
+df_lasso <- data.frame(var = names(coefs_std), coef = coefs_std) |>
+  mutate(selected = abs(coef) > 1e-8) |>
+  arrange(desc(abs(coef)))
+
+n_selected <- sum(df_lasso$selected)
+n_dropped  <- sum(!df_lasso$selected)
+dropped    <- paste(df_lasso$var[!df_lasso$selected], collapse = ", ")
+
+ggplot(df_lasso |> filter(selected),
+       aes(reorder(var, abs(coef)), coef, fill = coef > 0)) +
+  geom_col(width = 0.7) +
+  geom_hline(yintercept = 0, linewidth = 0.4) +
+  coord_flip() +
+  scale_fill_manual(values = c(`TRUE` = "tomato", `FALSE` = "steelblue"),
+                    labels = c(`TRUE`  = "Positif (X ↑ → CO2 ↑)",
+                               `FALSE` = "Négatif (X ↑ → CO2 ↓)"),
+                    name = NULL) +
+  labs(title    = sprintf("Palmarès Lasso : les %d variables qui pilotent vraiment le CO2",
+                          n_selected),
+       subtitle = sprintf("λ optimal = %.4f (validation croisée 10-fold)  |  %d variables mises à zéro : %s",
+                          cv$lambda.min, n_dropped,
+                          ifelse(n_dropped == 0, "aucune",
+                                 paste0(substr(dropped, 1, 80),
+                                        ifelse(nchar(dropped) > 80, "...", "")))),
+       x = NULL, y = "Coefficient standardisé (ppm de CO2 résiduel par 1 sd de variation)") +
+  theme(legend.position = "bottom")
+```
+
+**Comment lire ce graphique.** Chaque barre est **une variable retenue par le lasso**, classée de la plus importante (en haut) à la moins importante (en bas). **Plus la barre est longue, plus la variable pèse** dans l'explication du CO2. La couleur dit le sens : **rouge = quand X monte, le CO2 monte aussi** ; **bleu = quand X monte, le CO2 baisse**. Les variables absentes du graphique ont été **mises à zéro par l'algorithme** — leur information est déjà portée par leurs voisines.
+
+**Ce qu'on observe.** Les variables qui dominent le palmarès sont exactement celles que la physique attend en première ligne du lien CO2 ↔ climat : **température (T2m, T500), humidité atmosphérique (PWAT), flux infrarouge ciel-clair (CSDLF) et descendant (DLWRF)** — toutes signatures directes de l'effet de serre. Les variables redondantes (par exemple un thermomètre en plus quand on en a déjà un) sont écartées sans perte d'information.
+
+> **À retenir.** Le lasso confirme la régression : **une poignée de variables physiques bien choisies** (température, humidité, flux infrarouge) suffit à expliquer l'essentiel des variations annuelles du CO2. Pas besoin des 21 variables.
+
+## Qui pilote qui ? Le test de causalité de Granger
+
+> **Analogie.** Si vous voyez les feuilles bouger juste *avant* d'entendre le vent dans les arbres, vous concluez (à raison) que le vent précède le mouvement des feuilles, donc le vent **cause** le mouvement. Le test de Granger fait pareil : il vérifie si **les variations d'une série précèdent (et permettent de prédire) celles d'une autre**. Si X précède Y, on dit « X cause Y au sens de Granger ». Ce n'est pas une preuve de causalité physique, mais une forte indication temporelle.
+
+On applique ce test avec un **délai de 6 mois** (résultat de la phase 1) sur deux représentations différentes :
+
+- **résidus** : les petites variations propres après retrait de la tendance commune,
+- **d12** : les **taux annuels** (variation par rapport au même mois de l'année précédente), qui sont la grandeur naturellement utilisée pour étudier les flux annuels de carbone.
+
+```{r granger}
+gr <- read.csv(file.path(OUT_DIR, "granger_results.csv"))
+
+cat("=== Granger sur RÉSIDUS (lag 6 mois) ===\n")
+print(gr |> filter(repr == "resid") |>
+        select(var, p_x_to_co2, p_co2_to_x, sens) |>
+        arrange(p_x_to_co2))
+
+cat("\n=== Granger sur d12 (taux annuel) ===\n")
+print(gr |> filter(repr == "d12") |>
+        select(var, p_x_to_co2, p_co2_to_x, sens) |>
+        arrange(p_x_to_co2))
+
+cat("\n=== Synthèse par représentation ===\n")
+print(gr |> count(repr, sens))
+```
+
+```{r granger-plot, fig.width=11, fig.height=9}
+gr_visual <- gr |>
+  filter(repr %in% c("resid", "d12")) |>
+  select(repr, var, p_x_to_co2, p_co2_to_x) |>
+  pivot_longer(c(p_x_to_co2, p_co2_to_x),
+               names_to = "direction", values_to = "p") |>
+  mutate(direction = recode(direction,
+                            p_x_to_co2 = "Climat → CO2",
+                            p_co2_to_x = "CO2 → climat"),
+         repr = recode(repr,
+                       resid = "Résidus (petites variations)",
+                       d12   = "Taux annuels (d12)"),
+         repr = factor(repr,
+                       levels = c("Résidus (petites variations)",
+                                  "Taux annuels (d12)")),
+         significant = p < 0.05,
+         label = ifelse(significant, "OUI", "non"))
+
+# Ordre des variables : par nombre total de directions significatives, puis par p min
+order_vars <- gr_visual |>
+  group_by(var) |>
+  summarise(score = sum(significant) - min(p) * 0.001, .groups = "drop") |>
+  arrange(score) |>
+  pull(var)
+
+ggplot(gr_visual,
+       aes(direction, factor(var, levels = order_vars), fill = significant)) +
+  geom_tile(color = "white", linewidth = 1.2) +
+  geom_text(aes(label = label, color = significant),
+            size = 3.4, fontface = "bold") +
+  scale_fill_manual(values = c(`TRUE` = "#2ca02c", `FALSE` = "grey88"),
+                    guide = "none") +
+  scale_color_manual(values = c(`TRUE` = "white", `FALSE` = "grey55"),
+                     guide = "none") +
+  facet_wrap(~ repr, nrow = 1) +
+  labs(title    = "Test de Granger — qui précède qui ? (lag 6 mois)",
+       subtitle = "Vert = la série de gauche permet de prédire celle de droite (p < 0.05)\nGris = pas de lien temporel détecté",
+       x = NULL, y = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.y    = element_text(face = "bold"),
+        strip.text     = element_text(face = "bold", size = 12),
+        panel.grid     = element_blank())
+```
+
+**Comment lire ce graphique.** Chaque ligne est **une variable**. Pour chacune, on regarde **deux questions** : « est-ce que le climat permet de prédire le CO2 ? » (colonne de gauche) et « est-ce que le CO2 permet de prédire le climat ? » (colonne de droite). **Vert = OUI** (lien temporel détecté), **gris = non**. Les deux panneaux comparent deux façons de mesurer : à gauche les petites variations résiduelles, à droite les taux annuels (plus naturels pour le cycle du carbone).
+
+**Le contraste entre les deux panneaux est saisissant** :
+
+- **Sur les résidus** : presque tout est gris. Les petites variations après retrait de la tendance sont **trop bruitées** pour qu'un lien temporel net émerge.
+- **Sur les taux annuels (d12)** : **15 variables sur 21** sont **vertes dans la colonne « climat → CO2 »**, avec des p-values extrêmement basses : SPFH2m (humidité, 6×10⁻⁹), CSDLF (3×10⁻⁹), PWAT (1×10⁻⁸), DLWRF (1×10⁻⁸), T500 (2×10⁻⁸). Dans l'autre sens (« CO2 → climat »), beaucoup moins de cases sont vertes.
+
+> **À retenir — résultat majeur de la phase 4.** À l'échelle interannuelle, c'est **le climat qui pilote le CO2**, pas l'inverse. Mécanisme : quand il fait plus chaud/humide dans les tropiques, la biosphère et l'océan **relâchent plus de CO2** (respiration accrue, solubilité plus faible) — et cet effet se voit **avec environ 6 mois de décalage** dans la concentration atmosphérique. C'est exactement le résultat ENSO observé en phase 1 (corrélation taux CO2 ↔ ONI = +0.28 à 6 mois).
+>
+> **Attention** : ce résultat parle de **variations courtes** (mois → quelques années). À long terme, la **tendance** du CO2 reste pilotée par les émissions humaines, qui réchauffent ensuite le climat (CO2 → climat). Les deux sens coexistent à des échelles de temps différentes.
+
+# Synthèse finale
+
+```{r synthesis-final}
+synth <- read.csv(file.path(OUT_DIR, "synthese_finale.csv"))
+knitr::kable(synth, digits = 3, caption = "Tableau de synthèse final (21 variables)")
+```
+
+## Conclusions scientifiques majeures
+
+1. **Pondération cos(lat) indispensable.** Sans elle, T2m globale serait sous-estimée de plusieurs K. Avec elle, les 18 sanity checks passent (T2m = 288 K, PWAT = 25 kg/m², CRE_net = −19.7 W/m² conforme IPCC).
+
+2. **Tendance commune ≠ lien physique.** 10 variables sur 21 affichent r > 0.5 sur les niveaux et r < 0.25 sur les résidus → corrélation **trompeuse**. Le détendrage est obligatoire pour étudier le lien interannuel propre.
+
+3. **R² multivarié = 0.75 sur résidus** sur version brute, **0.44 après homogénéisation** (phase 3). Une partie substantielle du R² brut était un artefact du saut CFSR→CFSv2 ; la valeur réaliste est ~0.44, soit ~6 prédicteurs explicatifs équivalents. Le lien climat-CO2 reste multivarié et significatif, mais plus modeste qu'il ne paraît avant correction.
+
+4. **Causalité dominante climat → CO2 à 6 mois.** Sur les taux annuels (d12), 15 variables sur 21 causent significativement le CO2 (p souvent < 1e-7), contre seulement 8 dans le sens inverse. Le carbon cycle response (réponse de la biosphère et de l'océan aux variations climatiques) précède les variations du CO2 atmosphérique.
+
+5. **Cohérence avec la phase 1.** Le lag 6 mois confirme le résultat ENSO observé sur les taux annuels CO2 ↔ ONI dans la phase 1 (r = +0.28 à lag 6).
+
+6. **Homogénéisation CFSR/CFSv2 obligatoire pour les CRE et flux all-sky.** 17 des 21 variables présentent un saut significatif au passage 2010 / 2011, dont 5 supérieurs à 1 sd (CRE_LW −1.92 sd, PRMSL −1.77 sd, CRE_SW +1.56 sd, TCDC +1.14 sd, CRE_net +1.13 sd). La correction par modèle additif `lm(y ~ t + step + month)` retire l'artefact tout en préservant la tendance climatique. Les **vrais signaux** robustes au saut sont T2m, DLWRF, SPFH2m, PWAT, T500, CSDLF, CSULF, ULWRF, APCP.
+
+## Limites et améliorations possibles
+
+- Le détendrage linéaire laisse une **courbure cubique résiduelle** qui pénalise le R² (visible en U dans le fit). Un GAM ou polynôme cubique sur le temps comme régresseur de contrôle améliorerait probablement le R².
+- Les **moyennes globales** sont aveugles aux signaux régionaux dominants (Amazonie, Indonésie, Sibérie). Une analyse à 0.5° × 0.5° par bandes de latitude révélerait probablement des corrélations supérieures sur les régions tropicales.
+- L'**homogénéisation CFSR/CFSv2** par step indicator unique est une première approximation : elle suppose que le saut est instantané et constant en magnitude. Une homogénéisation plus fine pourrait modéliser un saut **dépendant du mois** ou utiliser une **période de chevauchement** (CFSR continue jusqu'à 2010 avec CFSv2 disponible dès 2011 — pas de chevauchement direct dans nos fichiers, mais un comparable nominal pourrait être obtenu via ERA5).
+- Les tests de Granger ont été menés à un **lag fixe de 6 mois** ; une analyse multi-lag (1, 3, 6, 12 mois) raffinerait l'identification du délai dominant pour chaque variable.
+- Le passage à **0.5° × 0.5°** permettrait des analyses régionales et un découpage par bandes de latitude (boréale, tropicale, australe), ce qui correspondrait mieux à l'asymétrie hémisphérique observée en phase 1 (ratio MLO/SPO = 5.6×).

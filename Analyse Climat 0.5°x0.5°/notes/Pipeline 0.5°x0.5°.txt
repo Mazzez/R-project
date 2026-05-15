@@ -1,0 +1,132 @@
+Pipeline Analyse Climat 0.5° × 0.5° — chaîne complète (phase 5)
+
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ A. Source de données                                               │
+  ├────────────────────────────────────────────────────────────────────┤
+  │ Data/0.5° x 0.5°/YYYY/pgbh04.gdas.YYYYMM.{grb2,grib2}              │
+  │   • 57 Go, 566 fichiers GRIB2                                      │
+  │   • 630 records / fichier (CFSR 1979-2010 + CFSv2 2011-2025)       │
+  │   • Préfixe pgbh04 = high resolution (vs pgbl04 = 2.5°)            │
+  └────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  │  15_extract_grib_subset.sh  (~12 min)
+                                  ▼
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ B. Subset GRIB filtré (18 records)                                 │
+  ├────────────────────────────────────────────────────────────────────┤
+  │ Final Version/0.5° x 0.5° subset/YYYY/pgbh04.gdas.YYYYMM.{grb2,grib2}│
+  │   • ~4 Go (57→4 = ×14 réduction)                                   │
+  │   • Identique aux records du 2.5° (codes GRIB2 vérifiés en phase 3)│
+  └────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  │  01_extract_subset.sh  (~5 min)
+                                  ▼
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ C. NetCDF-4 compressés                                             │
+  ├────────────────────────────────────────────────────────────────────┤
+  │ Final Version/processed/nc_subset_05/YYYY/YYYYMM.nc                         │
+  │   • 566 fichiers, grille 720 × 361 (=259 920 pixels)               │
+  │   • zlib level 4, ~4 Go total                                      │
+  └────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  │  02_band_means.R  (~30 min)
+                                  ▼
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ D. Moyennes par bande de latitude (intervalles non-chevauchants)   │
+  ├────────────────────────────────────────────────────────────────────┤
+  │ outputs/monthly_band_means_05.csv  (3396 lignes = 566 mois × 6     │
+  │ bandes ; 21 colonnes : date, year, month, band + 18 variables)     │
+  │                                                                    │
+  │ Bandes : austral (<-60), temperate_S [-60,-30[, tropical [-30,30], │
+  │          temperate_N ]30,60], boreal (>60), global                 │
+  │ Total 5 bandes = 361 lignes lat (assertion stopifnot vérifiée)     │
+  └────────────────────────────────────────────────────────────────────┘
+                                  │
+            ┌─────────────────────┼─────────────────────┐
+            │                     │                     │
+            ▼                     ▼                     ▼
+  ┌─────────────────┐  ┌────────────────────┐  ┌──────────────────────┐
+  │ 03_validation.R │  │ 07_compare_with_   │  │ 08_regression_per_   │
+  │ (~1 min)        │  │   25deg.R (<1 min) │  │   zone.R (~3 min)    │
+  ├─────────────────┤  ├────────────────────┤  ├──────────────────────┤
+  │ stats_par_bande │  │ comparison_05_vs_  │  │ regression_per_zone  │
+  │ trends_par_band │  │   25.csv           │  │   .csv               │
+  │ + plots 01-04   │  │ + plot 07          │  │ R² par bande +       │
+  │   (anomalies +  │  │ (validation        │  │ par hotspot          │
+  │   GES + climat) │  │  croisée 0.5°/2.5°)│  │                      │
+  └─────────────────┘  └────────────────────┘  └──────────────────────┘
+
+  Pipeline pixel-par-pixel (cube 720 × 361 × 566 chargé en RAM par var)
+                                  │
+            ┌─────────────────────┼─────────────────────┐
+            ▼                     ▼                     ▼
+  ┌─────────────────┐  ┌────────────────────┐  ┌──────────────────────┐
+  │ 04_trend_maps.R │  │ 05_correlation_    │  │ 06_hotspot_          │
+  │ (~20 min)       │  │   maps.R (~15 min) │  │   analysis.R (~3 min)│
+  ├─────────────────┤  ├────────────────────┤  ├──────────────────────┤
+  │ 18 cartes pente │  │ 18 cartes corr     │  │ 4 régions × 4 vars   │
+  │ Sen pixel-à-pixel│ │ pixel-à-pixel vs   │  │ (T2m, PWAT, APCP,    │
+  │ + p-value MK 1/16│ │ CO2 résiduel       │  │  TCDC)               │
+  │ + trend_grids.rds│ │ + correlation_     │  │ + hotspots_series    │
+  │                 │  │   grids.rds         │  │ + hotspots_summary   │
+  └─────────────────┘  └────────────────────┘  └──────────────────────┘
+                                  │
+                                  │  09_granger_per_zone.R  (~1 min)
+                                  │  10_hemisphere_asymmetry.R  (~30 s)
+                                  ▼
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ E. Analyses transversales (utilisent monthly_band_means + hotspots)│
+  ├────────────────────────────────────────────────────────────────────┤
+  │ outputs/granger_per_zone.csv      Granger d12 lag=6 par zone       │
+  │ outputs/hemisphere_asymmetry.csv  amplitudes saisonnières par bande│
+  │ outputs/hemisphere_asymmetry_ratio.csv  ratio N/S vs MLO/SPO=5.6×  │
+  │ + plot 08_hemisphere_asymmetry.png                                 │
+  └────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  │  rmarkdown::render
+                                  ▼
+                       Climat_report_05.html
+
+
+  ═══════════════════════════════════════════════════════════════════════
+  Bilan volumes
+  ═══════════════════════════════════════════════════════════════════════
+  Source GRIB           : 57 Go
+  Subset GRIB           :  4 Go  (×14 réduction)
+  NetCDF compressé      :  4 Go
+  Outputs (CSV + RDS)   : 25 Mo
+  Plots + cartes        : 50 Mo (36 cartes + 8 plots)
+  Rapport HTML          :  7 Mo
+                          ────
+  Total reproductible   :  90 Mo (hors source raw 57 Go)
+
+  ═══════════════════════════════════════════════════════════════════════
+  Bilan durées (un Ryzen 5 16 Go, source NetCDF déjà disponible)
+  ═══════════════════════════════════════════════════════════════════════
+  15  ~12 min      | extraction subset GRIB
+  01  ~ 5 min      | conversion NetCDF
+  02  ~30 min      | moyennes par bande (566 fichiers × 18 vars × 6 bandes)
+  03  < 1 min      | validation + plots anomalies
+  04  ~20 min      | 18 cartes trend (chargement de 18 cubes en RAM)
+  05  ~15 min      | 18 cartes correlation
+  06  ~ 3 min      | hotspots (avec optimisation I/O 16× plus rapide)
+  07  < 1 min      | validation croisée 0.5° vs 2.5°
+  08  ~ 3 min      | régression climat→CO2 par zone (10 zones × ≤18 vars)
+  09  ~ 1 min      | Granger par zone (10 zones × ≤18 vars × 2 directions)
+  10  ~30 sec      | asymétrie hémisphérique
+                   ─────────
+                   ~90 min depuis source brute, ~5 min en re-run incrémental
+
+  ═══════════════════════════════════════════════════════════════════════
+  Corrections critiques appliquées
+  ═══════════════════════════════════════════════════════════════════════
+  • 02 : bandes redéfinies en intervalles NON-chevauchants avec assertion
+         stopifnot(sum membership == 1) — frontières ±30, ±60 étaient
+         précédemment comptées dans 2 bandes (overlap de 2 lignes/border).
+  • 05 : compute_corr_grid restreint aux dates non-NA du CO2 — sans ce
+         fix, toutes les corrélations étaient propagées en NA (3 mois CO2
+         manquants fin 2025 → NA partout dans cov_xy via yc[i]).
+  • 06 : refactor I/O — un seul passage sur les 566 NetCDF au lieu de
+         4 régions × 4 vars × 566 = 9 056 ouvertures (×16 plus rapide).
+  • 06 : unname(sens.slope) + row.names = NULL pour éliminer les
+         rownames cosmétiques "Sen's slope...1, Sen's slope...2".

@@ -1,0 +1,54 @@
+Pipeline mis à jour avec succès. Récapitulatif :
+
+  Nouveau flux
+
+  Data/2.5° x 2.5°/                        (3.5 Go, 630 records/fichier — source originale)
+         │
+         │ 15_extract_grib_subset.sh       (à lancer une seule fois)
+         ▼
+  Final Version/2.5° x 2.5° subset/        (172 Mo, 18 records/fichier — équivalent compact)
+         │
+         │ 01_extract_subset.sh            (NOUVEAU : lit depuis le subset)
+         ▼
+  Final Version/processed/nc_subset_25/             (413 Mo NetCDF, 564 fichiers)
+         │
+         │ 02_global_means.R
+         ▼
+  outputs/monthly_global_means_25.csv      (564 mois × 18 variables)
+         │
+         │ 03_validation.R, 04_merge, 05_prep, 06_corr, ..., 14_verify
+         ▼
+  21 plots de synthèse + 84 fiches per-variable + 4 phases d'analyse
+
+  Vérification d'équivalence
+
+  ┌─────────────────────────────────────────────────────────┬──────────────────────────────────────────┐
+  │                          Test                           │                 Résultat                 │
+  ├─────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
+  │ Nombre de NetCDF générés                                │ 564 (identique avant/après)              │
+  ├─────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
+  │ Comparaison R: all(old == new) sur 4 variables × 1 mois │ TRUE TRUE TRUE TRUE                      │
+  ├─────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
+  │ Hash MD5 (1979-01, 2000-01, 2024-12)                    │ 3/3 identiques                           │
+  ├─────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
+  │ Durée 01_extract_subset.sh                              │ 16 sec (vs 1 min depuis source complète) │
+  └─────────────────────────────────────────────────────────┴──────────────────────────────────────────┘
+
+  Bénéfices
+
+  - Pipeline 5× plus rapide sur la conversion NetCDF (16 sec vs 60 sec)
+  - Source du pipeline 20× plus petite (172 Mo vs 3.5 Go) → portable, partageable, archivable
+  - Aucune perte d'information : les bytes GRIB des 18 records sont conservés tels quels (verbatim) par wgrib2 -grib_out
+  - La source originale 3.5 Go reste intacte sur disque ; on peut la supprimer si besoin de place
+
+  Modifications apportées
+
+  ┌──────────────────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │           Fichier            │                                                                      Changement                                                                       │
+  ├──────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ scripts/01_extract_subset.sh │ SRC_BASE pointe vers le subset ; étape wgrib2 -match retirée (records déjà filtrés) ; sanity check sur le compte de records ; commentaires mis à jour │
+  ├──────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ README.md                    │ Pipeline réordonné avec étape 15 en pré-requis ; durées ajustées                                                                                      │
+  └──────────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  Le pipeline est plus simple, plus rapide, et la source de données est désormais autonome dans un dossier de 172 Mo.

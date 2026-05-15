@@ -1,0 +1,83 @@
+État des lieux confirmé : 57 Go / 566 fichiers, grille 720 × 361 (vs 144 × 73 pour le 2.5°), 98 Mo par fichier (vs
+   ~6 Mo en 2.5°).
+
+  Plan proposé pour la phase 0.5°
+
+  Question centrale : que veut-on faire de plus qu'en 2.5° ?
+
+  À l'échelle d'une moyenne globale, le 0.5° donne quasiment le même résultat que le 2.5° (l'écart sur T2m est de
+  l'ordre de 0.01 K). Refaire à l'identique le pipeline serait coûteux pour zéro gain scientifique.
+
+  Le vrai apport du 0.5° est l'analyse spatiale :
+
+  ┌────────────────────────┬────────────────────────────────────────────────────────────────────────────────────┐
+  │     Type d'analyse     │                              Ce que ça permet de voir                              │
+  ├────────────────────────┼────────────────────────────────────────────────────────────────────────────────────┤
+  │ Bandes de latitude     │ Boréale (60-90°N), tempérée nord (30-60°N), tropicale (-30/+30°), tempérée sud,    │
+  │                        │ australe                                                                           │
+  ├────────────────────────┼────────────────────────────────────────────────────────────────────────────────────┤
+  │ Cartes de tendance     │ Réchauffement amplifié en Arctique, refroidissement marginal de certains océans    │
+  ├────────────────────────┼────────────────────────────────────────────────────────────────────────────────────┤
+  │ Régions clés           │ Amazonie (puits/source CO2), Indonésie (El Niño), Sibérie (permafrost), Sahel      │
+  ├────────────────────────┼────────────────────────────────────────────────────────────────────────────────────┤
+  │ Asymétrie              │ Cohérence avec le ratio MLO/SPO = 5.6× de la phase 1                               │
+  │ hémisphérique          │                                                                                    │
+  ├────────────────────────┼────────────────────────────────────────────────────────────────────────────────────┤
+  │ Corrélations spatiales │ Carte des r entre chaque pixel et le CO2 trend                                     │
+  └────────────────────────┴────────────────────────────────────────────────────────────────────────────────────┘
+
+  Pipeline proposé pour Analyse Climat 0.5°x0.5°/
+
+  ┌─────┬─────────────────────────────────┬──────────────────────────────────────────────────────┬─────────────┐
+  │  #  │             Script              │                         Rôle                         │   Durée     │
+  │     │                                 │                                                      │   estimée   │
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────────────────┼─────────────┤
+  │ 0   │ 15_extract_grib_subset.sh       │ source 57 Go → subset 0.5° (~3 Go)                   │ ~15 min     │
+  │     │ (adapté)                        │                                                      │             │
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────────────────┼─────────────┤
+  │ 1   │ 01_extract_subset.sh (adapté)   │ subset GRIB → NetCDF                                 │ ~5 min      │
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────────────────┼─────────────┤
+  │ 2   │ 02_band_means.R (NOUVEAU)       │ moyennes par bande de latitude (5 bandes × 18 vars × │ ~30 min     │
+  │     │                                 │  564 mois)                                           │             │
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────────────────┼─────────────┤
+  │ 3   │ 03_validation.R                 │ sanity checks identiques au 2.5°                     │ < 1 min     │
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────────────────┼─────────────┤
+  │ 4   │ 04_trend_maps.R (NOUVEAU)       │ cartes pixel-par-pixel : pente Sen, p-value MK       │ ~20 min     │
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────────────────┼─────────────┤
+  │ 5   │ 05_correlation_maps.R (NOUVEAU) │ cartes : r entre chaque pixel et CO2_trend           │ ~15 min     │
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────────────────┼─────────────┤
+  │ 6   │ 06_hotspot_analysis.R (NOUVEAU) │ anomalies sur 4 régions clés (Amazonie, Sahel,       │ ~5 min      │
+  │     │                                 │ Sibérie, Indonésie)                                  │             │
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────────────────┼─────────────┤
+  │ 7   │ 07_compare_with_25deg.R         │ comparer moyennes globales 0.5° vs 2.5° (validation  │ < 1 min     │
+  │     │ (NOUVEAU)                       │ croisée)                                             │             │
+  └─────┴─────────────────────────────────┴──────────────────────────────────────────────────────┴─────────────┘
+
+  Volumes attendus
+
+  ┌──────────────────────────────────────────────┬────────┬───────────┬───────────┐
+  │                    Étape                     │ Source │  Sortie   │  Facteur  │
+  ├──────────────────────────────────────────────┼────────┼───────────┼───────────┤
+  │ Source originale                             │ 57 Go  │ —         │ —         │
+  ├──────────────────────────────────────────────┼────────┼───────────┼───────────┤
+  │ Subset GRIB (18 records)                     │ 57 Go  │ ~3 Go     │ ÷ 19      │
+  ├──────────────────────────────────────────────┼────────┼───────────┼───────────┤
+  │ NetCDF (564 fichiers × 25× plus de cellules) │ 3 Go   │ ~10-15 Go │ × 4-5     │
+  ├──────────────────────────────────────────────┼────────┼───────────┼───────────┤
+  │ CSV par bande de latitude (5 × 18 × 564)     │ —      │ ~3 Mo     │ minuscule │
+  ├──────────────────────────────────────────────┼────────┼───────────┼───────────┤
+  │ Cartes PNG                                   │ —      │ ~50 Mo    │ —         │
+  └──────────────────────────────────────────────┴────────┴───────────┴───────────┘
+
+  Question pour toi
+
+  Veux-tu :
+
+  A. Le pipeline complet comme proposé ci-dessus (analyses spatiales nouvelles + cartes) — l'option qui justifie
+  vraiment le 0.5° et apporte des résultats nouveaux par rapport au 2.5°.
+
+  B. Juste un clone du pipeline 2.5° (mêmes scripts, juste plus fin) — l'option facile mais qui apportera peu
+  d'information nouvelle (la plupart des moyennes globales seront identiques au 2.5° à 0.01-0.05 % près).
+
+  C. Un mix progressif : on fait d'abord (A0+A1) extraction subset, puis on choisit une à deux analyses spatiales
+  clés (bandes de latitude + cartes de tendance) sans tout faire d'un coup.

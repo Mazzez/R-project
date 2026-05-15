@@ -18,7 +18,7 @@ suppressPackageStartupMessages({
 
 Sys.setenv(X13_PATH = x13binary::x13path())
 
-data_dir <- "/home/mazzez/Bureau/R project/Data/CO2"
+data_dir <- "/home/mazzez/Bureau/R project/Final Version/CO2"
 out_dir  <- "/home/mazzez/Bureau/R project/Final Version/Analyse CO2/outputs"
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 

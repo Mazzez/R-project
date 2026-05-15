@@ -1,3 +1,6 @@
+# ============================================================
+# R / RStudio
+# ============================================================
 .RData
 .Rhistory
 .Rproj.user/
@@ -5,3 +8,35 @@
 cache/
 .DS_Store
 .idea/
+
+# ============================================================
+# Système / éditeur
+# ============================================================
+.claude/
+*.swp
+*~
+
+# ============================================================
+# DONNÉES LOURDES — exclues du repo (régénérables via scripts)
+# ============================================================
+# 1. Subset GRIB 0.5° (4.1 GB) — régénérable via 15_extract_grib_subset.sh
+0.5° x 0.5° subset/
+
+# 2. NetCDF compressés (4.7 GB) — régénérables via 01_extract_subset.sh
+processed/
+
+# 3. (Le 2.5° subset à 172 MB est conservé : utile pour reproduire rapidement)
+# 2.5° x 2.5° subset/
+
+# ============================================================
+# Sorties HTML lourdes (régénérables via rmarkdown::render)
+# ============================================================
+# On garde les .html pour consultation directe sur GitHub Pages
+# (mais on exclut les caches de rendu qui sont volumineux)
+*_cache/
+
+# ============================================================
+# Logs des scripts R (bruit getfattr + outputs verbeux)
+# ============================================================
+**/outputs/*.log
+**/outputs/*.Rout

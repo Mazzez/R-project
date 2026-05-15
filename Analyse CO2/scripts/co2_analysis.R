@@ -16,7 +16,7 @@ suppressPackageStartupMessages({
   library(scales)
 })
 
-data_path <- "/home/mazzez/Bureau/R project/Data/CO2/co2_mm_gl.csv"
+data_path <- "/home/mazzez/Bureau/R project/Final Version/CO2/co2_mm_gl.csv"
 out_dir   <- "/home/mazzez/Bureau/R project/Final Version/Analyse CO2/outputs"
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
@@ -101,18 +101,16 @@ cat("Amplitude moyenne du cycle saisonnier (STL) :",
     round(amp_seasonal, 3), "ppm\n")
 
 p_stl <- stl_df |>
-  pivot_longer(cols = c(observed, trend, seasonal, remainder),
+  pivot_longer(cols = c(observed, trend),
                names_to = "component", values_to = "value") |>
-  mutate(component = factor(component,
-                            levels = c("observed", "trend",
-                                       "seasonal", "remainder"))) |>
+  mutate(component = factor(component, levels = c("observed", "trend"))) |>
   ggplot(aes(date, value)) +
   geom_line(color = "steelblue") +
   facet_wrap(~ component, scales = "free_y", ncol = 1) +
-  labs(title    = "Décomposition STL du CO2 mondial",
+  labs(title    = "Décomposition STL du CO2 mondial (observed + trend)",
        subtitle = "Source : NOAA GML, moyennes mensuelles globales",
        x = NULL, y = "ppm")
-save_plot(p_stl, "03_stl_decomposition", h = 8)
+save_plot(p_stl, "03_stl_decomposition", h = 5)
 
 # ============================================================
 # 4. Cycle saisonnier détaillé

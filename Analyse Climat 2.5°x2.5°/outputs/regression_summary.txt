@@ -1,0 +1,85 @@
+=== Régression complète ===
+
+
+Call:
+lm(formula = y ~ ., data = X)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-4.1690 -0.9704 -0.0836  1.0336  5.2532 
+
+Coefficients: (3 not defined because of singularities)
+              Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  2.814e-14  5.966e-02   0.000   1.0000    
+T2m          8.795e-01  2.054e+00   0.428   0.6687    
+T500         2.565e+00  4.828e-01   5.312 1.58e-07 ***
+SPFH2m      -2.551e+03  2.451e+03  -1.041   0.2985    
+PWAT        -1.138e+00  8.095e-01  -1.406   0.1603    
+APCP        -1.003e+02  6.796e+00 -14.765  < 2e-16 ***
+TCDC         1.186e-01  7.764e-02   1.528   0.1271    
+DLWRF       -7.641e-02  4.033e-01  -0.189   0.8498    
+ULWRF        5.865e+00  7.452e+00   0.787   0.4316    
+DSWRF        1.424e+00  7.780e-01   1.831   0.0677 .  
+USWRF       -1.267e+00  7.114e-01  -1.780   0.0756 .  
+PRMSL       -6.167e-02  7.638e-03  -8.074 4.37e-15 ***
+CSDSF        4.325e-01  6.090e-01   0.710   0.4779    
+CSUSF        3.408e+00  7.115e-01   4.790 2.16e-06 ***
+CSDLF        2.804e+00  5.498e-01   5.100 4.69e-07 ***
+CSULF       -8.630e+00  7.390e+00  -1.168   0.2434    
+CDUVB       -2.948e+01  4.316e+01  -0.683   0.4949    
+DUVB        -4.963e+01  5.130e+01  -0.968   0.3337    
+ALBDO       -7.466e+00  9.610e-01  -7.770 3.94e-14 ***
+CRE_SW              NA         NA      NA       NA    
+CRE_LW              NA         NA      NA       NA    
+CRE_net             NA         NA      NA       NA    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.417 on 545 degrees of freedom
+Multiple R-squared:  0.7495,	Adjusted R-squared:  0.7412 
+F-statistic:  90.6 on 18 and 545 DF,  p-value: < 2.2e-16
+
+
+
+=== Modèle stepwise AIC (backward) ===
+
+
+Call:
+lm(formula = y ~ T500 + PWAT + APCP + TCDC + DSWRF + USWRF + 
+    PRMSL + CSUSF + CSDLF + CSULF + DUVB + ALBDO, data = X)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-4.2105 -0.9436 -0.0712  1.0012  5.2944 
+
+Coefficients:
+              Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  2.690e-14  5.952e-02   0.000   1.0000    
+T500         2.438e+00  4.481e-01   5.441 8.00e-08 ***
+PWAT        -1.372e+00  7.179e-01  -1.911   0.0566 .  
+APCP        -1.002e+02  6.506e+00 -15.405  < 2e-16 ***
+TCDC         1.096e-01  6.950e-02   1.576   0.1155    
+DSWRF        1.904e+00  1.333e-01  14.286  < 2e-16 ***
+USWRF       -1.420e+00  5.886e-01  -2.412   0.0162 *  
+PRMSL       -6.367e-02  7.194e-03  -8.850  < 2e-16 ***
+CSUSF        3.698e+00  5.400e-01   6.847 2.02e-11 ***
+CSDLF        2.628e+00  3.392e-01   7.750 4.47e-14 ***
+CSULF       -2.589e+00  2.551e-01 -10.149  < 2e-16 ***
+DUVB        -8.324e+01  6.955e+00 -11.968  < 2e-16 ***
+ALBDO       -7.941e+00  7.863e-01 -10.099  < 2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.413 on 551 degrees of freedom
+Multiple R-squared:  0.748,	Adjusted R-squared:  0.7425 
+F-statistic: 136.3 on 12 and 551 DF,  p-value: < 2.2e-16
+
+
+
+=== Lasso (lambda.min) — coefs non nuls ===
+     T500     CSUSF     CSDLF       T2m     CSDSF     DSWRF    CRE_SW      TCDC 
+   2.5340    2.3673    2.1969    2.0743    1.2653    0.3658    0.1447    0.1125 
+  CRE_net     PRMSL     USWRF    CRE_LW      PWAT     CSULF     ALBDO     CDUVB 
+   0.1010   -0.0635   -0.2881   -0.4141   -0.7295   -2.6519   -6.7439  -69.0703 
+     APCP    SPFH2m 
+-100.2371 -405.7246 

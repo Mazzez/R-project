@@ -1,0 +1,546 @@
+---
+title: "Analyse climat ↔ CO2 — haute résolution spatiale"
+subtitle: "Phase 5 — Analyse spatiale 0.5° × 0.5° (1979-2025)"
+author: "Mazzez Mohamed Amine"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    code_folding: show
+    theme: flatly
+    highlight: tango
+    fig_width: 11
+    fig_height: 6
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo      = TRUE,
+  message   = FALSE,
+  warning   = FALSE,
+  cache     = TRUE,
+  fig.align = "center",
+  dpi       = 110
+)
+
+suppressPackageStartupMessages({
+  library(dplyr); library(tidyr); library(ggplot2); library(scales)
+})
+
+OUT_DIR <- "/home/mazzez/Bureau/R project/Final Version/Analyse Climat 0.5°x0.5°/outputs"
+PLOT    <- file.path(OUT_DIR, "plots")
+MAPS    <- file.path(OUT_DIR, "maps")
+theme_set(theme_minimal(base_size = 12))
+```
+
+# Introduction
+
+> **L'enjeu de la phase 5 en une phrase.** Les phases 2-4 ont étudié des **moyennes globales** — un chiffre par mois pour toute la planète. La phase 5 **zoome** : on regarde **chaque pixel** d'une grille mondiale fine (720 × 361 = près de 260 000 pixels par mois), pour savoir **où** le réchauffement se produit vraiment, **où** le climat est le plus lié au CO2, et comment se comportent les **grandes régions clés** du cycle du carbone (Amazonie, Indonésie, Sibérie, Sahel).
+
+Trois questions guident cette phase :
+
+1. **Géographie du réchauffement.** Comment se distribue spatialement le changement climatique observé depuis 1979 ? Toutes les régions chauffent-elles au même rythme ?
+2. **Géographie du lien CO2 ↔ climat.** Existe-t-il des régions où le climat local suit *visuellement* la trajectoire du CO2 atmosphérique, et d'autres où le bruit interannuel domine ?
+3. **Hotspots du carbone.** Les quatre grandes régions qui pilotent les flux mondiaux de CO2 — Amazonie (forêt tropicale), Indonésie (tourbières et feux), Sibérie (permafrost), Sahel (semi-aride) — ont-elles des signaux climatiques cohérents avec leur rôle dans le cycle global ?
+
+> **Lien avec les phases précédentes.** Le 0.5° utilise **exactement les mêmes 18 variables** et **la même fenêtre temporelle** que le 2.5° (phases 2-4). Les codes GRIB2 sont identiques entre les deux résolutions, ce qui garantit l'équivalence physique. Une étape de **validation croisée** (script 07) vérifie que les deux pipelines convergent au niveau attendu.
+
+# Données et pipeline
+
+## Source et volume
+
+| Étape | Volume | Format |
+|---|---|---|
+| Source NCAR (`pgbh04`, 0.5°) | ~57 Go | GRIB2, 630 records par mois |
+| Subset filtré (18 records) | ~4 Go | GRIB2 miroir |
+| NetCDF-4 compressé | ~4 Go | grille 720 × 361 |
+| Période | 566 mois | 1979-01 → 2025-12 |
+
+Le préfixe **`pgbh04`** identifie les fichiers haute résolution (`h` = high), tandis que `pgbl04` (`l` = low) désignait les fichiers 2.5° utilisés en phase 2-4.
+
+## Les 8 étapes du pipeline
+
+```{r pipeline-table, echo=FALSE}
+pipeline <- tibble::tribble(
+  ~`#`, ~Script,                        ~Durée,       ~Sortie,
+  "0",  "15_extract_grib_subset.sh",    "~12 min",    "566 fichiers GRIB filtrés (57 Go → 4 Go)",
+  "1",  "01_extract_subset.sh",         "~5 min",     "566 NetCDF-4 zlib (~4 Go)",
+  "2",  "02_band_means.R",              "~30 min",    "moyennes par 5 bandes + global",
+  "3",  "03_validation.R",              "< 1 min",    "sanity checks + plots par bande",
+  "4",  "04_trend_maps.R",              "~20 min",    "18 cartes de tendance pixel-à-pixel",
+  "5",  "05_correlation_maps.R",        "~15 min",    "18 cartes de corrélation avec CO2",
+  "6",  "06_hotspot_analysis.R",        "~3 min",     "4 régions × 4 variables",
+  "7",  "07_compare_with_25deg.R",      "< 1 min",    "validation croisée 0.5° vs 2.5°"
+)
+knitr::kable(pipeline, caption = "Pipeline complet de la phase 5 (~90 min depuis zéro)")
+```
+
+# Phase 5.1 — Bandes de latitude : où chauffe-t-on le plus ?
+
+> **Analogie.** Au lieu de regarder « la moyenne de toute la planète », on découpe le globe en **5 grandes bandes de latitude** : pôle sud, sud tempéré, tropiques, nord tempéré, pôle nord. C'est comme passer d'un thermomètre unique à cinq thermomètres répartis du sud au nord. On peut alors voir **qui chauffe plus vite que qui**.
+
+## Les 5 bandes
+
+```{r bands-table, echo=FALSE}
+bands <- tibble::tribble(
+  ~Bande,                       ~Latitudes,       ~Lignes, ~Description,
+  "Australe",                   "−90° à −60°",    60,      "Antarctique et océans froids",
+  "Tempérée S",                 "−60° à −30°",    60,      "Patagonie, Afrique du Sud, Australie",
+  "Tropicale",                  "−30° à +30°",    121,     "Tropiques (Amazonie, Sahel, Indonésie)",
+  "Tempérée N",                 "+30° à +60°",    60,      "Europe, USA, Chine, Sibérie sud",
+  "Boréale",                    "+60° à +90°",    60,      "Arctique, Groenland, Sibérie nord"
+)
+knitr::kable(bands, caption = "Découpage en 5 bandes complémentaires (intervalles non-chevauchants)")
+```
+
+## Anomalie T2m par bande — l'amplification arctique
+
+```{r t2m-anom, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "03_T2m_anomaly_par_bande.png"))
+```
+
+**Comment lire ce graphique.** Chaque courbe est **une bande de latitude**. La valeur indique l'écart par rapport à la moyenne 1979-2025 de cette bande (anomalie). **Au-dessus de la ligne pointillée = plus chaud que la moyenne** ; en-dessous = plus froid. Les lignes lissées rendent visible la tendance long-terme.
+
+**Ce qu'on observe.**
+
+### Choix des 6 variables clés
+
+Les 18 variables traitées couvrent 4 grandes familles physiques. Pour un tableau récapitulatif lisible, on retient **6 variables représentatives** :
+
+| Variable | Famille | Rôle dans le climat |
+|---|---|---|
+| **T2m** | Thermo | Indicateur canonique du réchauffement |
+| **PWAT** | Hydrologique | Réservoir de vapeur d'eau (Clausius-Clapeyron) |
+| **DSWRF** | Radiatif SW | Solaire descendant en surface (global dimming/brightening) |
+| **TCDC** | Nuages | Couverture nuageuse — grande incertitude des modèles |
+| **DLWRF** | Radiatif LW *all-sky* | IR descendant total → **effet de serre observé** |
+| **CSDLF** | Radiatif LW *ciel-clair* | IR descendant SANS nuages → **signature GES pure** |
+
+DLWRF et CSDLF sont ajoutées pour révéler la **signature directe des gaz à effet de serre** : CSDLF ne dépend pas des nuages et capture donc le forçage GES dans sa forme la plus pure.
+
+### Tableau des tendances Sen par bande
+
+```{r trends-band-table, echo=FALSE}
+tb <- read.csv(file.path(OUT_DIR, "trends_par_bande.csv"))
+tb_clean <- tb |>
+  mutate(across(where(is.numeric), ~ signif(.x, 3)))
+knitr::kable(tb_clean,
+             caption = "Tendances Sen annualisées par bande (en unité de la variable, par an)",
+             col.names = c("Bande",
+                           "T2m (K/an)", "PWAT (kg/m²/an)",
+                           "DSWRF (W/m²/an)", "TCDC (%/an)",
+                           "DLWRF (W/m²/an)", "CSDLF (W/m²/an)"))
+```
+
+**Trois lectures clés du tableau** :
+
+**1. Amplification arctique (T2m)**
+
+- **Boréale : +0.052 K/an** — **3.7 × plus rapide que les tropiques** (+0.014 K/an).
+- **Australe : −0.008 K/an** — la seule bande qui se refroidit légèrement (dynamique vortex polaire, ozone).
+- **Tropicale : +0.014 K/an** mais avec le plus fort **signal hydrologique** (PWAT +0.079 kg/m²/an) → intensification du cycle de l'eau (Clausius-Clapeyron, ~7 %/K).
+
+**2. Signature de l'effet de serre (CSDLF — colonne la plus à droite)**
+
+CSDLF (IR descendant en ciel-clair) est **positif dans TOUTES les bandes**, y compris l'Antarctique. C'est le résultat le plus important du tableau : même là où la surface se refroidit (Australe), l'**atmosphère renvoie plus d'IR vers le sol qu'avant**. Cette uniformité est précisément ce qu'on attend du forçage GES — il agit partout, indépendamment des conditions locales.
+
+- **Tropicale +0.193 W/m²/an** : le signal CSDLF le plus fort, soit **+9 W/m² en 47 ans**.
+- Bandes tempérées et boréale : +0.09 à +0.19 W/m²/an, toutes positives.
+- **Australe : encore +0.016 W/m²/an**, signal faible mais positif malgré le refroidissement T2m.
+
+**3. Effet de serre + nuages (DLWRF — avant-dernière colonne)**
+
+DLWRF (IR descendant total, avec nuages) est cohérent avec T2m : **plus la surface chauffe, plus l'atmosphère lui renvoie d'IR** (rétroaction de Planck).
+
+- **Boréale : +0.163 W/m²/an** — le plus fort, cohérent avec la plus forte hausse T2m.
+- **Australe : −0.013 W/m²/an** — négatif, suivant le refroidissement local de surface.
+
+> **À retenir — deux résultats simultanés et complémentaires** :
+>
+> 1. Le **réchauffement de surface (T2m) est très inégal** géographiquement : amplification arctique × 3.7, refroidissement australe.
+> 2. La **signature radiative GES (CSDLF) est uniforme** : positive partout, même là où T2m baisse. C'est la preuve observationnelle directe que l'**effet de serre additionnel** opère à l'échelle globale — la diversité géographique du réchauffement vient de la circulation atmosphérique/océanique, pas d'une absence de forçage local.
+
+### Visualisation de la signature effet de serre
+
+```{r ges-plot, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "04_GES_signature.png"))
+```
+
+**Comment lire ce graphique.** Grille **5 bandes (lignes) × 2 variables (colonnes)**. À gauche, **DLWRF** (IR descendant total, *avec* nuages). À droite, **CSDLF** (IR descendant en *ciel-clair*, sans nuages — la signature GES la plus pure). On affiche les anomalies désaisonnées ; la ligne noire LOESS révèle la tendance long-terme.
+
+**Le résultat le plus important du rapport — à l'œil nu** :
+
+- **Colonne CSDLF (droite)** : la ligne noire LOESS **monte clairement dans les 5 bandes**, de l'Australe (en haut) à la Boréale (en bas). Le forçage GES dépose **+5 à +9 W/m²** supplémentaires en surface partout sur la planète depuis 1979.
+- **Colonne DLWRF (gauche)** : monte aussi partout sauf en Australe (où le LOESS dérive légèrement vers le bas), parce que cette bande se refroidit en surface (T2m −0.008 K/an) → la rétroaction de Planck atténue le signal radiatif net.
+
+> **À retenir.** La colonne CSDLF est la **preuve observationnelle directe et la plus claire** du forçage GES dans tout le projet. Aucun pixel du globe n'échappe à l'augmentation de l'IR descendant en ciel-clair — c'est l'**empreinte digitale** du changement climatique anthropique, mesurée indépendamment de tout modèle.
+
+## Vue d'ensemble des 4 variables clés par bande
+
+```{r bands-series, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "01_series_par_bande.png"))
+```
+
+**Comment lire ce graphique.** Grille de **5 bandes (lignes) × 4 variables (colonnes) = 20 panneaux séparés**, chacun avec sa propre échelle. On affiche les **anomalies désaisonnées** (valeur − moyenne du mois de janvier, février, ...), ce qui **élimine le bruit saisonnier** et laisse apparaître clairement la **tendance long-terme** soulignée par la ligne noire LOESS. La ligne pointillée grise est le zéro (= année moyenne). Les lignes du tableau vont de l'Australe (en haut) à la Boréale (en bas).
+
+**Lectures rapides — colonne par colonne** :
+
+- **T2m** : le LOESS noir part en-dessous de zéro dans les années 1980 et monte clairement au-dessus dans les années 2010-2020 pour les bandes Tempérée N et Boréale. L'**amplification arctique** est visible : la pente de la Boréale (en bas) est la plus raide.
+- **PWAT** (humidité) : la **tropicale (rangée du milieu)** montre la hausse la plus nette — signature de l'intensification du cycle hydrologique.
+- **DSWRF** (solaire descendant) : variabilité interannuelle forte (volcans, ENSO) ; la **Tropicale** montre une chute après 2010 puis une reprise.
+- **TCDC** (nuages) : la **Tropicale** a fortement augmenté entre 2000 et 2020 (+0.26 %/an) ; les autres bandes sont stables.
+
+# Phase 5.2 — Cartes de tendance pixel-par-pixel
+
+> **Analogie.** Jusqu'ici, chaque bande donnait **un seul chiffre** (la pente moyenne sur 60+ lignes de latitude). Maintenant on calcule la pente **séparément pour chacun des 260 000 pixels** de la grille. C'est comme passer d'un baromètre par région à un baromètre par village : on voit alors les vraies disparités locales.
+
+**Méthode.** En chaque pixel, on retire d'abord la moyenne mensuelle (saisonnalité), puis on ajuste une droite linéaire sur les 47 ans. La pente de cette droite est la **vitesse locale** d'évolution. Mann-Kendall (test non-paramétrique de significativité) est calculé sur 1 pixel sur 16 (pour rester rapide).
+
+## Réchauffement de surface (T2m)
+
+```{r trend-t2m, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(MAPS, "04_trend_T2m.png"))
+```
+
+**Comment lire cette carte.** **Rouge = pixel qui se réchauffe**, **bleu = pixel qui se refroidit**, **blanc = stable**. Plus la couleur est intense, plus la pente est forte.
+
+**Faits saillants** :
+
+- L'**hémisphère Nord est massivement rouge**. La Sibérie, l'Alaska, le Canada arctique et le Groenland sont les zones les plus chaudes (>+0.05 K/an = +2.3 K en 47 ans).
+- L'**équateur Pacifique-est** apparaît même légèrement bleu — c'est la « cool tongue » : un refroidissement faible observé qui contraste avec les modèles climatiques. Sujet de débat actif (Seager 2019).
+- L'**Antarctique** est mixte, avec un fort réchauffement de la péninsule mais un léger refroidissement intérieur.
+
+## Humidité atmosphérique (PWAT)
+
+```{r trend-pwat, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(MAPS, "04_trend_PWAT.png"))
+```
+
+**Ce qu'on observe.** L'humidité augmente surtout dans la **ceinture tropicale**, conformément à la physique : une atmosphère plus chaude retient mécaniquement plus de vapeur d'eau (~7 % par degré, loi de Clausius-Clapeyron). C'est l'**intensification du cycle hydrologique** prédite par tous les modèles climatiques.
+
+## Couverture nuageuse (TCDC) et pression (PRMSL)
+
+::: {style="display: flex; gap: 1em;"}
+```{r trend-tcdc, echo=FALSE, out.width="50%", fig.show='hold'}
+knitr::include_graphics(file.path(MAPS, "04_trend_TCDC.png"))
+knitr::include_graphics(file.path(MAPS, "04_trend_PRMSL.png"))
+```
+:::
+
+**TCDC** (couverture nuageuse) montre un **assombrissement tropical** (plus de nuages le long de la zone de convergence intertropicale) et un éclaircissement aux moyennes latitudes — cohérent avec l'**expansion de la cellule de Hadley** documentée par Lu (2007).
+
+**PRMSL** (pression au niveau de la mer) montre des **anomalies positives sur l'Atlantique Nord et le Pacifique Nord** et négatives dans certaines zones tropicales — autre signature de l'expansion de la cellule de Hadley.
+
+> **À retenir.** Le réchauffement n'est ni uniforme ni simple : il a une **structure spatiale claire** dictée par la circulation atmosphérique et océanique. Les zones polaires nord, les tropiques, et l'expansion des cellules atmosphériques sont les trois grands signatures cohérentes avec les modèles climatiques.
+
+# Phase 5.3 — Cartes de corrélation locale climat ↔ CO2
+
+> **Analogie.** En phase 4 (2.5°), on a vu que sur les **moyennes globales**, le climat « explique » environ 75 % des variations annuelles du CO2. Mais cette moyenne mondiale cache des disparités énormes. Ici, on demande **à chaque pixel** : *« tes petites variations interannuelles ressemblent-elles à celles du CO2 mondial ? »*. La réponse donne une **carte mondiale de la corrélation locale**.
+
+**Méthode importante.** Comme en phase 4, on travaille sur les **résidus** (variations après retrait de la tendance commune). Sans cela, presque tous les pixels seraient artificiellement très corrélés au CO2 — simplement parce que tous montent depuis 1979.
+
+## Température de surface : où la T2m suit-elle le CO2 ?
+
+```{r corr-t2m, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(MAPS, "05_corr_T2m.png"))
+```
+
+**Comment lire cette carte.** **Rouge = pixel dont les petites variations annuelles sont positivement liées à celles du CO2** (quand le CO2 résiduel monte, T2m monte). **Bleu = lien inverse**. **Blanc = pas de lien**. L'échelle est limitée à [−1, +1].
+
+**Ce qu'on observe.**
+
+- **La médiane mondiale est faible** (|r| ≈ 0.08) — cohérent avec la phase 4 : à l'échelle locale et interannuelle, le forçage CO2 est largement masqué par les oscillations naturelles (ENSO, NAO, AMO, volcans).
+- **Quelques régions atteignent |r| ≈ 0.6**, notamment l'Eurasie boréale, l'Alaska, l'Atlantique tropical et l'Indonésie. Ces régions sont à la fois **fortement réchauffées** ET **temporellement cohérentes** avec la trajectoire du CO2.
+
+## Effet de serre (CSDLF — LW descendant ciel-clair)
+
+```{r corr-csdlf, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(MAPS, "05_corr_CSDLF.png"))
+```
+
+**CSDLF** est le flux infrarouge descendant en **conditions ciel-clair** — la **mesure la plus pure de l'effet de serre** (pas polluée par la variabilité nuageuse). Sa carte de corrélation montre des **zones étendues positives** : c'est la signature directe attendue du forçage CO2.
+
+## Vue des 18 variables
+
+Pour une analyse complète, les **18 cartes de tendance** et les **18 cartes de corrélation** sont disponibles dans le dossier `outputs/maps/`. Les statistiques agrégées :
+
+```{r corr-stats, echo=FALSE}
+# Médianes |r| reportées dans la console du script 05
+corr_stats <- tibble::tribble(
+  ~Variable, ~`médiane |r|`, ~`max |r|`, ~Lecture,
+  "CDUVB",   "0.169",  "0.610",   "UV-B ciel clair — signal radiatif le plus pur",
+  "CSDLF",   "0.073",  "0.605",   "Effet de serre LW descendant",
+  "T2m",     "0.078",  "~0.6",    "Réchauffement de surface",
+  "CSULF",   "0.073",  "0.787",   "LW ascendant — surface plus chaude",
+  "ALBDO",   "0.070",  "0.688",   "Fonte glace/neige aux hautes latitudes",
+  "Autres",  "< 0.10", "0.4-0.6", "Médiane faible, max localisé"
+)
+knitr::kable(corr_stats,
+             caption = "Statistiques de corrélation pixel-par-pixel pour les principales variables")
+```
+
+> **À retenir.** Sur les **résidus**, le lien CO2 ↔ climat reste **localement faible mais cohérent**. Il existe — mais il est noyé dans la variabilité naturelle qui domine à l'échelle des pixels et des années. **C'est la combinaison de tous les pixels** (moyenne globale, phase 4) qui rend le signal CO2 → climat aussi visible.
+
+# Phase 5.4 — Hotspots régionaux du cycle du carbone
+
+> **Pourquoi ces quatre régions ?** Le cycle global du carbone n'est pas uniforme : il est dominé par quelques grandes régions qui agissent comme des **puits** (absorbent du CO2) ou des **sources** (en émettent). Ce sont les **hotspots** où une analyse fine apporte plus d'information que la moyenne mondiale.
+
+## Les 4 régions
+
+```{r hotspots-def, echo=FALSE}
+hot <- tibble::tribble(
+  ~Région,       ~Plage,                 ~Cellules, ~Rôle_carbone,
+  "Amazonie",    "5°S-5°N, 70°W-50°W",   1681,      "Plus grand puits CO2 tropical, fragilisé par sécheresses",
+  "Indonésie",   "10°S-5°N, 95°E-141°E", 2883,      "Forte modulation ENSO, pic d'émissions par feux en El Niño",
+  "Sibérie",     "55°N-70°N, 70°E-130°E",3751,      "Permafrost (gel sous-sol), amplification arctique",
+  "Sahel",       "10°N-20°N, 20°W-40°E", 2541,      "Semi-aride, sensible aux flux SST tropicaux"
+)
+knitr::kable(hot, caption = "Définition des 4 hotspots régionaux du cycle du carbone")
+```
+
+## Évolution de T2m sur les 4 hotspots
+
+```{r hotspot-t2m, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "06a_T2m_hotspots.png"))
+```
+
+**Comment lire ce graphique.** Chaque couleur est une région. Les **lignes fines** sont les anomalies mensuelles (très bruitées par la variabilité saisonnière et interannuelle), les **lignes épaisses** sont leurs lissages LOESS qui révèlent la **vraie tendance**.
+
+**Ce qu'on observe.** La **Sibérie** se réchauffe le plus rapidement et avec le plus d'amplitude (~+1.5 K depuis 1979), conforme à l'amplification arctique. L'**Indonésie** et l'**Amazonie** chauffent plus modérément mais de manière nette. Le **Sahel** se réchauffe aussi, mais avec une variabilité interannuelle particulièrement forte.
+
+## Tendances et corrélations détaillées
+
+```{r hotspots-summary-table, echo=FALSE}
+hs <- read.csv(file.path(OUT_DIR, "hotspots_summary.csv")) |>
+  mutate(across(where(is.numeric), ~ signif(.x, 3)))
+hs$signif <- ifelse(hs$mk_pvalue < 0.001, "***",
+              ifelse(hs$mk_pvalue < 0.01,  "**",
+              ifelse(hs$mk_pvalue < 0.05,  "*",
+              ifelse(hs$mk_pvalue < 0.1,   ".", " "))))
+knitr::kable(hs,
+             caption = "Tendances Sen et corrélation aux résidus CO2 par hotspot",
+             col.names = c("Région", "Variable", "Sen (/an)", "p-value MK",
+                           "r aux résidus CO2", "Signif."))
+```
+
+**Trois lectures clés** :
+
+- **Indonésie** est **le hotspot où la signature climat-CO2 est la plus nette** : T2m, PWAT et TCDC montrent toutes des tendances très significatives (p < 0.001), ET leurs corrélations sur résidus avec le CO2 sont les plus élevées (~+0.15 à +0.17). Le rôle d'amplificateur ENSO de l'Indonésie sur le cycle du carbone se voit dans les données.
+
+- **Sibérie** a une **tendance T2m forte (+0.037 K/an)** — supérieure à la moyenne tropicale — mais sa **variabilité interannuelle est si élevée** que le test Mann-Kendall ne passe pas le seuil (p = 0.28). Ce n'est pas une absence de réchauffement, c'est un signal noyé dans le bruit. Conforme à Cohen (2020).
+
+- **Sahel** montre un **signal complexe** : T2m corrélée *négativement* avec CO2 résiduel (−0.12), mais PWAT/APCP corrélées *positivement* (+0.20) et TCDC en hausse forte. C'est cohérent avec le **« reverdissement du Sahel »** documenté depuis 2000 (Brandt 2017) — un phénomène qui combine fertilisation par CO2, retour des moussons, et rétroactions végétation-pluies.
+
+## Toutes les variables × régions
+
+```{r hotspot-4vars, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "06b_4vars_hotspots.png"))
+```
+
+**Comment lire ce graphique.** Grille de **4 régions (lignes) × 4 variables (colonnes) = 16 panneaux séparés**. On affiche les **anomalies désaisonnées** (la saisonnalité est retirée), avec en noir la **tendance LOESS** qui ressort clairement, et en pointillés gris le zéro de référence.
+
+**Lectures rapides** :
+
+- **T2m** : la **Sibérie** (3ᵉ rangée) montre le plus gros saut d'anomalie (~+2 K du début à la fin) — amplification arctique. L'Indonésie et l'Amazonie montent plus modérément.
+- **PWAT** : l'**Indonésie** et l'**Amazonie** ont des tendances positives nettes — atmosphère plus humide.
+- **APCP** : anomalies très faibles dans toutes les régions (précipitations stables en moyenne).
+- **TCDC** : montée nette dans l'**Amazonie**, le **Sahel** et l'**Indonésie** — couverture nuageuse accrue dans les zones tropicales et semi-arides.
+
+> **À retenir.** Les hotspots permettent une lecture **plus mécaniste** du lien climat-CO2. L'Indonésie illustre l'amplification ENSO ; la Sibérie illustre l'amplification arctique noyée dans la variabilité ; le Sahel illustre les rétroactions végétation-CO2-pluies en zone semi-aride.
+
+# Phase 5.5 — Analyses statistiques par zone
+
+Les phases 5.1–5.4 ont géographiquement quantifié le réchauffement et son lien avec le CO2 « pixel par pixel ». Cette section **prolonge la phase 4 (régression et causalité)** dans l'espace géographique : on refait les analyses statistiques **séparément pour chaque bande de latitude et chaque hotspot**, pour répondre à trois questions complémentaires :
+
+1. **Où le lien climat-CO2 est-il le plus fort ?** (régression multivariée par zone)
+2. **Où la dynamique « climat précède CO2 » est-elle valide ?** (Granger par zone)
+3. **L'asymétrie hémisphérique du climat retrouve-t-elle celle du CO2 ?** (lien avec phase 1)
+
+## Régression multivariée par zone
+
+> **Méthode.** Pour chaque bande/hotspot, on prend les résidus (désaisonnés + détendus) de toutes les variables climat de la zone et on ajuste `lm(co2_resid ~ toutes les variables climat)`. Le **R²** mesure la part des variations interannuelles du CO2 expliquée par le climat de cette zone.
+
+```{r reg-per-zone, echo=FALSE}
+rpz <- read.csv(file.path(OUT_DIR, "regression_per_zone.csv"))
+rpz_band <- rpz |> filter(type == "bande") |>
+  arrange(desc(R2)) |>
+  select(zone, R2, R2_adj, n_obs, top1, top2, top3)
+rpz_hot  <- rpz |> filter(type == "hotspot") |>
+  arrange(desc(R2)) |>
+  select(zone, R2, R2_adj, n_obs, top1, top2, top3)
+
+knitr::kable(rpz_band, digits = 3,
+             caption = "Régression climat → CO2 par bande de latitude (18 variables explicatives)",
+             col.names = c("Bande", "R²", "R² ajusté",
+                           "n obs.", "Top 1", "Top 2", "Top 3"))
+knitr::kable(rpz_hot, digits = 3,
+             caption = "Régression climat → CO2 par hotspot (4 variables : T2m, PWAT, APCP, TCDC)",
+             col.names = c("Hotspot", "R²", "R² ajusté",
+                           "n obs.", "Top 1", "Top 2", "Top 3"))
+```
+
+**Comment lire ce tableau.** R² = part de la variance des résidus CO2 expliquée par le climat local. **Plus le R² est élevé, plus le climat de la zone est lié au CO2 global.** Les colonnes Top 1/2/3 donnent les 3 variables les plus statistiquement influentes par |t-stat|.
+
+**Trois lectures clés** :
+
+1. **Global = 0.746** → cohérent avec la phase 4 du 2.5° (R² = 0.748). Validation croisée du résultat global indépendamment du chemin de calcul.
+2. **Tropicale = 0.691** → la bande tropicale capte presque autant de variance que le global. C'est attendu : la biosphère tropicale (Amazonie + Indonésie + bassin du Congo) est le plus gros puits/source de CO2 dans le bilan annuel.
+3. **Boréale = 0.278 seulement** → étonnamment bas. Malgré l'amplification arctique très forte sur T2m, la **variabilité interannuelle** boréale ne suit pas particulièrement le CO2 — elle est dominée par les oscillations atmosphériques (NAO, AO) plutôt que par le forçage GES.
+4. **Hotspots R² = 0.04–0.10** → bien plus faibles que les bandes. Deux raisons : (i) seulement 4 variables explicatives (vs 18 en bande), (ii) régions de plus petite taille → bruit pixel-à-pixel plus marqué.
+
+> **À retenir.** Le lien climat → CO2 **n'est pas uniforme spatialement** : il est porté principalement par la **bande tropicale** (R² = 0.69). C'est cohérent avec la littérature : la biosphère tropicale module le CO2 atmosphérique à l'échelle interannuelle, principalement via ENSO.
+
+## Causalité de Granger par zone
+
+> **Méthode.** Pour chaque zone et chaque variable, on calcule les **taux annuels d12** (X_t − X_{t-12}) et on teste `grangertest(co2_d12 ~ X_d12, order=6)`. Combien de variables passent le seuil p < 0.05 par zone ?
+
+```{r granger-per-zone, echo=FALSE}
+grpz <- read.csv(file.path(OUT_DIR, "granger_per_zone.csv"))
+
+synth <- grpz |>
+  group_by(zone, type) |>
+  summarise(n_vars = n(),
+            n_x_to_co2_sig = sum(p_x_to_co2 < 0.05, na.rm = TRUE),
+            n_co2_to_x_sig = sum(p_co2_to_x < 0.05, na.rm = TRUE),
+            .groups = "drop") |>
+  mutate(pct_x_to_co2 = round(100 * n_x_to_co2_sig / n_vars, 0),
+         dominant = case_when(
+           n_x_to_co2_sig > n_co2_to_x_sig + 2 ~ "Climat → CO2",
+           n_co2_to_x_sig > n_x_to_co2_sig + 2 ~ "CO2 → climat",
+           TRUE                                ~ "équilibré / faible")) |>
+  arrange(type, desc(n_x_to_co2_sig))
+
+knitr::kable(synth,
+             caption = "Synthèse Granger par zone (d12, lag 6 mois)",
+             col.names = c("Zone", "Type", "n vars", "X→CO2 sig.",
+                           "CO2→X sig.", "% X→CO2", "Sens dominant"))
+```
+
+**Lectures** :
+
+- **Global (12/18 variables climat→CO2)** confirme exactement le résultat de la phase 4 (15/21 lorsqu'on inclut les CRE).
+- **Boréale (11/18) et Tropicale (11/18)** sont les bandes avec le plus de variables Granger-causales — le climat de ces deux régions précède le CO2 à 6 mois.
+- **Australe : 0/18** → aucune variable de la bande australe ne précède le CO2. L'hémisphère sud, avec son immense océan, **n'est pas un acteur du cycle annuel du CO2**.
+- **Hotspot Indonésie : 4/4** variables Granger-causales → confirme que la zone Maritime Continent est un **forte forçant** du CO2 atmosphérique, conforme à la littérature ENSO-feux.
+- **Sahel : 0/4** → le Sahel ne précède pas le CO2 ; les corrélations résiduelles vues en phase 5.4 sont des liens **synchrones** sans avance temporelle.
+
+> **À retenir — résultat spatial majeur** : le sens « climat → CO2 » à 6 mois (résultat fort de la phase 4) est porté principalement par la **bande tropicale + hémisphère Nord**, et **pas du tout** par l'hémisphère Sud austral. C'est cohérent avec la géographie de la biosphère terrestre, concentrée au Nord et dans les tropiques.
+
+## Asymétrie hémisphérique — lien avec la phase 1
+
+> **Pourquoi ?** En phase 1, on a quantifié l'asymétrie saisonnière du CO2 entre Mauna Loa (hémisphère Nord) et le Pôle Sud : **ratio MLO/SPO = 5.6×**. Cette asymétrie vient du fait que la quasi-totalité des terres émergées (et donc de la biosphère terrestre) est dans l'hémisphère Nord, ce qui amplifie le cycle saisonnier du CO2. Voyons si on retrouve cette même asymétrie dans le **climat lui-même**.
+
+```{r asym-plot, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "08_hemisphere_asymmetry.png"))
+```
+
+**Comment lire ce graphique (panneau du haut)**. Chaque courbe est le **cycle saisonnier moyen de T2m** d'une bande (anomalie par rapport à la moyenne annuelle de cette bande). Plus la courbe est ample (oscillation max-min grande), plus le cycle saisonnier est marqué dans cette région.
+
+**Panneau du bas** : amplitude saisonnière T2m de chaque bande, classées de la plus saisonnière (gauche, Boréale = 27.7 K) à la moins saisonnière (Tropicale = 1.2 K).
+
+```{r asym-table, echo=FALSE}
+amp <- read.csv(file.path(OUT_DIR, "hemisphere_asymmetry.csv"))
+amp_w <- amp |> pivot_wider(names_from = band, values_from = amplitude) |>
+  mutate(across(where(is.numeric), ~ signif(.x, 3)))
+knitr::kable(amp_w,
+             caption = "Amplitudes saisonnières par bande × variable (max − min de la climatologie mensuelle)")
+
+ratio <- read.csv(file.path(OUT_DIR, "hemisphere_asymmetry_ratio.csv")) |>
+  mutate(across(where(is.numeric), ~ signif(.x, 3)))
+knitr::kable(ratio,
+             caption = "Ratio N/S des amplitudes saisonnières (Boréale / Australe)")
+```
+
+**Trois résultats clés** :
+
+1. **T2m ratio N/S = 1.98×** (Boréale 27.7 K vs Australe 14.0 K) — l'hémisphère Nord a un cycle saisonnier T2m **2× plus marqué** que le Sud. Cohérent avec la géographie : continents au N → faible inertie thermique → grosse amplitude saisonnière ; océans au S → grande inertie → amplitude amortie.
+
+2. **PWAT ratio N/S = 4.27×** — l'asymétrie humidité est **beaucoup plus forte** que l'asymétrie thermique. C'est l'effet combiné « biosphère + cycle hydrologique » : plus de végétation au N → plus d'évapotranspiration → plus de vapeur d'eau saisonnière.
+
+3. **Comparaison à MLO/SPO = 5.6×** : le ratio CO2 (5.6×) est **plus proche du ratio PWAT (4.27×) que du ratio T2m (1.98×)**. Cela suggère que l'asymétrie saisonnière du CO2 transite principalement par la **biosphère terrestre et le cycle hydrologique** (qui sont eux-mêmes très asymétriques), et pas directement par la température.
+
+> **À retenir — boucle de cohérence avec la phase 1**.
+>
+> - Phase 1 (CO2) : MLO/SPO = 5.6×
+> - Phase 5 (climat) : T2m N/S = 1.98×, PWAT N/S = 4.27×
+>
+> La hiérarchie 1.98 < 4.27 < 5.6 confirme que **l'asymétrie hémisphérique du CO2 est amplifiée par la biosphère** par rapport au simple signal thermique. Le 0.5° valide géographiquement ce que la phase 1 avait quantifié sur les stations.
+
+# Phase 5.6 — Validation croisée 0.5° vs 2.5°
+
+> **Pourquoi cette étape ?** Les phases 2-4 utilisent une grille 2.5° (10 512 pixels), la phase 5 une grille 0.5° (260 000 pixels). Si les deux pipelines sont corrects, les **moyennes globales** doivent être quasi identiques — c'est juste la même physique vue à deux résolutions. Sinon, il y a un bug à corriger.
+
+```{r compare-table, echo=FALSE}
+cmp <- read.csv(file.path(OUT_DIR, "comparison_05_vs_25.csv")) |>
+  mutate(across(where(is.numeric), ~ signif(.x, 4)))
+knitr::kable(cmp,
+             caption = "Comparaison des moyennes globales 0.5° vs 2.5° pour les 18 variables",
+             col.names = c("Variable", "Mean 0.5°", "Mean 2.5°",
+                           "|Δ| moy", "|Δ| max", "Δ% moy", "Corrélation"))
+```
+
+```{r compare-plot, echo=FALSE, out.width="100%"}
+knitr::include_graphics(file.path(PLOT, "07_comparison.png"))
+```
+
+**Comment lire ce graphique.** Pour 4 variables clés (T2m, PWAT, DSWRF, TCDC), on superpose la série temporelle calculée en 0.5° (rouge) et en 2.5° (bleu). **Si les deux courbes se confondent, les deux pipelines sont équivalents.**
+
+**Résultat.**
+
+- **Toutes les corrélations entre 0.5° et 2.5° sont ≥ 0.9946.**
+- L'**écart relatif moyen est inférieur à 0.4 %** pour toutes les variables.
+- Les courbes superposées sont **visuellement indiscernables**.
+
+> **À retenir.** Les deux pipelines (2.5° et 0.5°) convergent au niveau attendu, ce qui **valide rétroactivement les conclusions de la phase 4** : la régression climat-CO2, le R² de 0.748, les 15 variables Granger-causales — tous ces résultats reposent sur des moyennes globales qu'on a maintenant calculées indépendamment à deux résolutions différentes, avec des résultats équivalents.
+
+# Synthèse finale
+
+## Les 8 résultats majeurs de la phase 5
+
+```{r results-table, echo=FALSE}
+results <- tibble::tribble(
+  ~`#`, ~Résultat,
+  1, "**Amplification arctique confirmée**. La bande boréale chauffe à +0.052 K/an, soit 3.7 × le rythme tropical (+0.014 K/an). L'Antarctique se refroidit légèrement (−0.008 K/an).",
+  2, "**Signature GES uniforme (CSDLF)**. L'IR descendant ciel-clair monte dans les 5 bandes (+5 à +9 W/m² sur 47 ans), même en Antarctique où T2m baisse. Preuve observationnelle directe que le forçage GES opère partout.",
+  3, "**Intensification du cycle hydrologique**. PWAT augmente fortement dans les tropiques (+0.079 kg/m²/an), conformément à la loi de Clausius-Clapeyron (~7 %/K).",
+  4, "**Lien climat-CO2 localement faible mais cohérent**. À l'échelle des pixels, |r| médian ≈ 0.07-0.17 avec des max locaux de 0.6-0.8. Le forçage CO2 est masqué par les oscillations naturelles (ENSO, NAO) au niveau local.",
+  5, "**Hotspots : Indonésie en tête**. L'Indonésie porte la signature climat-CO2 la plus interprétable (corr 0.15-0.17 + 4/4 variables Granger-causales). La Sibérie chauffe vite mais bruitée. Le Sahel illustre les rétroactions végétation-CO2.",
+  6, "**Lien climat→CO2 spatialement concentré aux tropiques + hémisphère Nord**. R² = 0.69 sur la bande tropicale (vs 0.28 boréale, 0.49 australe). 0/18 variables australes sont Granger-causales pour le CO2.",
+  7, "**Asymétrie hémisphérique du climat liée à celle du CO2**. T2m N/S = 1.98×, PWAT N/S = 4.27×, à comparer au ratio CO2 MLO/SPO = 5.6× de la phase 1. L'asymétrie CO2 transite par le cycle hydrologique/biosphère, pas directement par T2m.",
+  8, "**Validation croisée 0.5° vs 2.5°**. Corrélations ≥ 0.9946 sur les 18 variables ; R² climat→CO2 global identique (0.746 vs 0.748). Les deux pipelines convergent — la phase 4 est validée géographiquement."
+)
+knitr::kable(results, col.names = c("#", "Résultat"),
+             caption = "Synthèse des découvertes de la phase 5")
+```
+
+## Articulation du projet complet
+
+```{r project-articulation, echo=FALSE}
+proj <- tibble::tribble(
+  ~Phase,    ~Localisation,                       ~Apport,
+  "Phase 1", "`Analyse CO2/`",                    "Caractérisation statistique du CO2 atmosphérique 1979-2025 (Sen = 1.88 ppm/an, cycle saisonnier, modulation ENSO)",
+  "Phases 2-4", "`Analyse Climat 2.5°x2.5°/`",   "Moyennes globales, régression climat-CO2 (R² = 0.748), causalité Granger climat → CO2 sur taux annuels",
+  "**Phase 5**", "**`Analyse Climat 0.5°x0.5°/`**", "**Distribution spatiale, hotspots régionaux, validation croisée — confirme et géolocalise les résultats des phases 2-4**"
+)
+knitr::kable(proj, caption = "Articulation des 3 grandes phases du projet")
+```
+
+## Limites et améliorations possibles
+
+- **Saut CFSR/CFSv2 (jan 2011)** : non corrigé en phase 5 (les cartes spatiales le montrent comme bruit pixel-à-pixel cohérent, pas comme une rupture globale). Pour les corrélations sur résidus, c'est un biais mineur (le détendage linéaire absorbe une partie).
+- **Mann-Kendall sur sous-échantillon 1/16** : la carte de p-value est de résolution dégradée pour rester rapide. Pour une publication, refaire à pleine résolution (~4× plus lent). Suffisant pour le projet pédagogique.
+- **CO2 résiduel** : 3 mois récents NA (fin 2025) — gérés par exclusion explicite dans le script 05.
+- **Définition des hotspots** : choix manuel basé sur la littérature. Une alternative serait une **classification automatique** (k-means ou clustering hiérarchique sur les séries résidu CO2 ↔ T2m pixel-à-pixel).
+- **Saisonnalité** : on a moyenné sur toutes les saisons. Une analyse **par saison** (JJA/DJF) révélerait des patterns supplémentaires (mousson, polar night, etc.).
+
+## Conclusion générale
+
+La phase 5 **valide, raffine et géolocalise** les conclusions des phases précédentes :
+
+1. Le **réchauffement 1979-2025 est spatialement très inégal** — l'amplification arctique est l'un des résultats les plus robustes et les plus visuels du projet.
+2. Le **lien climat ↔ CO2** existe localement mais reste **plus visible à l'échelle globale** qu'à l'échelle locale : la combinaison de pixels (phase 4) révèle ce que les pixels seuls ne montrent pas.
+3. Les **hotspots régionaux** (Amazonie, Indonésie, Sibérie, Sahel) portent des signaux cohérents avec leur rôle dans le cycle du carbone — l'Indonésie en particulier illustre l'amplification ENSO documentée par la littérature.
+4. La **validation croisée 0.5° vs 2.5°** (corrélations ≥ 0.9946) confirme la cohérence interne du projet — les conclusions de la phase 4 reposent sur des moyennes globales reproductibles indépendamment à deux résolutions.

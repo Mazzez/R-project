@@ -35,7 +35,7 @@ suppressPackageStartupMessages({
 
 Sys.setenv(X13_PATH = x13binary::x13path())
 
-data_dir <- "/home/mazzez/Bureau/R project/Data/CO2"
+data_dir <- "/home/mazzez/Bureau/R project/Final Version/CO2"
 theme_set(theme_minimal(base_size = 12))
 ```
 
@@ -109,7 +109,7 @@ cat(sprintf("Hausse totale : %.2f ppm sur %.2f ans (~%.3f ppm/an)\n",
 
 ## Section 3 : Décomposition saisonnière (STL)
 
-```{r s03-stl, fig.height=8}
+```{r s03-stl, fig.height=5}
 co2_ts <- ts(co2$average, start = c(co2$year[1], co2$month[1]), frequency = 12)
 stl_fit <- stl(co2_ts, s.window = "periodic", robust = TRUE)
 stl_df  <- as.data.frame(stl_fit$time.series) |>
@@ -119,15 +119,13 @@ cat("Amplitude moyenne du cycle saisonnier (STL) :",
     round(diff(range(stl_df$seasonal)), 3), "ppm\n")
 
 stl_df |>
-  pivot_longer(c(observed, trend, seasonal, remainder),
+  pivot_longer(c(observed, trend),
                names_to = "component", values_to = "value") |>
-  mutate(component = factor(component,
-                            levels = c("observed", "trend",
-                                       "seasonal", "remainder"))) |>
+  mutate(component = factor(component, levels = c("observed", "trend"))) |>
   ggplot(aes(date, value)) +
   geom_line(color = "steelblue") +
   facet_wrap(~ component, scales = "free_y", ncol = 1) +
-  labs(title = "Décomposition STL du CO2 mondial",
+  labs(title    = "Décomposition STL du CO2 mondial (observed + trend)",
        subtitle = "Source : NOAA GML, moyennes mensuelles globales",
        x = NULL, y = "ppm")
 ```

@@ -1,0 +1,239 @@
+Phase 2 — Extraction des 18 variables climatiques GRIB2 (état final)
+
+  A. Objectif
+
+  Produire le CSV monthly_global_means_25.csv contenant pour chaque mois de 1979-01 à 2025-12 les moyennes globales pondérées cos(lat) des 18 variables, prêt à fusionner avec co2_mm_gl.csv pour les phases 3 (robustesse) et 4 (corrélations climat ↔ CO2).
+
+  B. Données d'entrée
+
+  ┌───────────────────┬──────────────────────────────────────────────────────────────────────────┐
+  │       Item        │                                  Valeur                                  │
+  ├───────────────────┼──────────────────────────────────────────────────────────────────────────┤
+  │ Source            │ /home/mazzez/Bureau/R project/Data/2.5° x 2.5°/YYYY/                     │
+  ├───────────────────┼──────────────────────────────────────────────────────────────────────────┤
+  │ Format            │ GRIB2 (1 fichier mensuel par mois)                                       │
+  ├───────────────────┼──────────────────────────────────────────────────────────────────────────┤
+  │ Naming            │ pgbl04.gdas.YYYYMM.grb2 (1979-2010, CFSR) puis .grib2 (2011-2025, CFSv2) │
+  ├───────────────────┼──────────────────────────────────────────────────────────────────────────┤
+  │ Records / fichier │ 630 (toutes variables × niveaux)                                         │
+  ├───────────────────┼──────────────────────────────────────────────────────────────────────────┤
+  │ Volume total      │ 3.5 Go en entrée                                                         │
+  └───────────────────┴──────────────────────────────────────────────────────────────────────────┘
+
+  C. Pipeline en 4 étapes (état final)
+
+  Le pipeline a évolué : on insère désormais un dossier subset GRIB intermédiaire (étape 0) qui rend le reste du pipeline 5× plus rapide et 20× plus léger sans aucune perte d'information.
+
+  Étape 0 — Extraction GRIB miroir (15_extract_grib_subset.sh)
+
+  Pour chaque fichier mensuel de la source, wgrib2 -match -grib_out filtre les 18 records utiles puis les écrit dans un nouveau GRIB2 miroir.
+
+  Source : Data/2.5° x 2.5°/YYYY/pgbl04.gdas.YYYYMM.{grb2,grib2}
+  Sortie : Final Version/2.5° x 2.5° subset/YYYY/pgbl04.gdas.YYYYMM.{grb2,grib2}
+
+  ┌───────────────────────────────────┬───────────────────────────────┐
+  │             Métrique              │          Valeur final         │
+  ├───────────────────────────────────┼───────────────────────────────┤
+  │ Records par fichier subset        │ 18                            │
+  ├───────────────────────────────────┼───────────────────────────────┤
+  │ Taille moyenne par fichier subset │ ~310 Ko                       │
+  ├───────────────────────────────────┼───────────────────────────────┤
+  │ Volume total subset               │ 172 Mo (vs 3.5 Go source)     │
+  ├───────────────────────────────────┼───────────────────────────────┤
+  │ Durée                             │ 1 min                         │
+  ├───────────────────────────────────┼───────────────────────────────┤
+  │ Conservation                      │ bytes GRIB verbatim (lossless)│
+  └───────────────────────────────────┴───────────────────────────────┘
+
+  Pattern de filtrage en 3 groupes :
+    1. Variables simples avec niveau "propre" (TMP@2m, TMP@500mb, SPFH@2m, APCP@surface, PRMSL@MSL, CSDSF/CSUSF/CSDLF/CSULF, CDUVB/DUVB/ALBDO@surface)
+    2. DLWRF/ULWRF/USWRF/DSWRF@surface ancrés sur la fenêtre [0-9]+@4 hour pour absorber 32@4h (CFSR/CFSv2 < 2022) et 31@4h (CFSv2 ≥ 2022)
+    3. PWAT/TCDC@entire atmosphere (espace en suffixe pour éviter les parenthèses)
+
+  Étape 1 — Conversion GRIB → NetCDF (01_extract_subset.sh)
+
+  Pour chaque mini-GRIB du subset, wgrib2 -set_date -set_ftime -netcdf harmonise les estampilles temporelles puis convertit en NetCDF.
+
+  Source : Final Version/2.5° x 2.5° subset/YYYY/pgbl04.gdas.YYYYMM.{grb2,grib2}
+  Sortie : Final Version/processed/nc_subset_25/YYYY/YYYYMM.nc
+
+  ┌───────────────────────┬─────────────────────────────┐
+  │       Métrique        │            Valeur           │
+  ├───────────────────────┼─────────────────────────────┤
+  │ Fichiers NetCDF       │ 564                         │
+  ├───────────────────────┼─────────────────────────────┤
+  │ Taille moyenne        │ ~750 Ko                     │
+  ├───────────────────────┼─────────────────────────────┤
+  │ Volume total          │ 413 Mo                      │
+  ├───────────────────────┼─────────────────────────────┤
+  │ Durée                 │ 16 sec                      │
+  └───────────────────────┴─────────────────────────────┘
+
+  Note : le set_date / set_ftime est nécessaire car certains fichiers récents (2022+) contiennent des records aux fenêtres de prévision différentes (0-4h vs 4-6h) que wgrib2 -netcdf rejette comme "input time before initial".
+
+  Étape 2 — Moyennes globales pondérées cos(lat) (02_global_means.R)
+
+  Pour chaque NetCDF :
+  1. ncdf4::nc_open() lit le fichier (lib R sans dépendance GDAL — terra n'est pas installable sans gdal-config)
+  2. Vecteur de poids cos(lat) calculé une seule fois (la grille 144 × 73 est constante)
+  3. Pour chaque variable : weighted.mean(values, w_grid) avec gestion des NA
+  4. Empilement dans un data.frame [year, month, date, T2m, T500, SPFH2m, PWAT, APCP, TCDC, DLWRF, ULWRF, DSWRF, USWRF, PRMSL, CSDSF, CSUSF, CSDLF, CSULF, CDUVB, DUVB, ALBDO]
+
+  Sortie : outputs/monthly_global_means_25.csv (564 lignes × 21 colonnes).
+  Durée  : 10 min 8 sec.
+
+  Étape 3 — Validation et visualisations (03_validation.R)
+
+  ┌───────────────────────┬────────────────────────────────────────────────┐
+  │         Test          │                  Résultat                      │
+  ├───────────────────────┼────────────────────────────────────────────────┤
+  │ Aucun NA inattendu    │ 0 NA (juin 2017 finalement présent)            │
+  ├───────────────────────┼────────────────────────────────────────────────┤
+  │ Plage T2m             │ 285 - 290 K (moyenne 288 K)        ✓           │
+  ├───────────────────────┼────────────────────────────────────────────────┤
+  │ Plage PWAT            │ 22 - 28 kg/m² (moyenne 25)         ✓           │
+  ├───────────────────────┼────────────────────────────────────────────────┤
+  │ Plage DSWRF           │ 181 - 205 W/m² (moyenne 194)       ✓           │
+  ├───────────────────────┼────────────────────────────────────────────────┤
+  │ Plage TCDC            │ 56 - 67 % (moyenne 60.5)           ✓           │
+  ├───────────────────────┼────────────────────────────────────────────────┤
+  │ Plage ALBDO           │ 8.5 - 12.4 % (moyenne 10.5)        ✓           │
+  ├───────────────────────┼────────────────────────────────────────────────┤
+  │ Continuité CFSR/CFSv2 │ saut visible jan 2011 sur 17/21 vars (phase 3) │
+  ├───────────────────────┼────────────────────────────────────────────────┤
+  │ Sanity 18/18          │ Toutes dans leurs fourchettes climatologiques  │
+  └───────────────────────┴────────────────────────────────────────────────┘
+
+  Calcul des Cloud Radiative Effects :
+  - CRE_SW  = (DSWRF − USWRF) − (CSDSF − CSUSF)   →  −45.1 W/m² (refroidissement par les nuages)
+  - CRE_LW  = (DLWRF − ULWRF) − (CSDLF − CSULF)   →  +25.4 W/m² (réchauffement par les nuages)
+  - CRE_net = CRE_SW + CRE_LW                     →  −19.7 W/m² (≈ consensus IPCC −20 W/m²) ✓
+
+  Étape 4 — Fusion avec le CO2 (04_merge_with_co2.R)
+
+  Fusion sur (year, month) avec co2_mm_gl.csv → tableau master climate_co2_monthly.csv qui sert d'entrée à toutes les analyses de phase 3 (robustesse) et phase 4 (corrélations).
+
+  Désaisonnement et détendrage sont effectués au niveau du script 05_preparation.R (5 représentations level/anom/resid/d1/d12).
+
+  D. Architecture finale des scripts (15 scripts dans Analyse Climat 2.5°x2.5°/scripts/)
+
+  Analyse Climat 2.5°x2.5°/
+  ├── scripts/
+  │   ├── 01_extract_subset.sh                  # subset GRIB → NetCDF
+  │   ├── 02_global_means.R                     # ncdf4 + cos-weighted mean
+  │   ├── 03_validation.R                       # sanity checks + plots + CRE
+  │   ├── 04_merge_with_co2.R                   # fusion CO2
+  │   ├── 05_preparation.R                      # 5 représentations temporelles
+  │   ├── 06_correlations.R                     # corrélations + heatmap + lag
+  │   ├── 07_regressions.R                      # LM complet, stepwise AIC, lasso CV
+  │   ├── 08_granger.R                          # causalité Granger (resid + d12)
+  │   ├── 09_synthese.R                         # tableau de synthèse final
+  │   ├── 10_per_variable_analysis.R            # 84 fiches détaillées (4/var)
+  │   ├── 11_trends_summary.R                   # tendances Sen+bootstrap+MK
+  │   ├── 12_homogenization.R                   # détection saut CFSR→CFSv2
+  │   ├── 13_phase3_homog_comparison.R          # phase 4 brute vs homogénéisée
+  │   ├── 14_verify_grib_codes.sh               # vérif codes GRIB2 CFSR↔CFSv2
+  │   └── 15_extract_grib_subset.sh             # source 3.5 Go → subset 172 Mo
+  ├── outputs/
+  │   ├── monthly_global_means_25.csv           # 564 × 21
+  │   ├── monthly_global_means_25_homog.csv     # 564 × 21 (saut retiré)
+  │   ├── climate_co2_monthly.csv               # CO2 + 18 vars + 3 CRE
+  │   ├── series_transformed.rds                # 5 représentations
+  │   ├── per_variable_stats.csv                # stats par variable
+  │   ├── trends_summary.csv                    # Sen + bootstrap IC
+  │   ├── cfsr_to_cfsv2_jumps.csv               # saut estimé par variable
+  │   ├── grib_codes_verification.csv           # codes GRIB2 CFSR↔CFSv2 (18/18 OK)
+  │   ├── per_variable/<VAR>/0[1-4]*.png        # 84 fiches PNG
+  │   └── plots/                                # 22 plots de synthèse
+  ├── notes/                                    # Phase 2.txt, Pipeline 2.5°x2.5°.txt
+  ├── Climat_report.Rmd                         # rapport reproductible
+  ├── Climat_report.html                        # rapport rendu (~17.9 Mo)
+  └── README.md
+
+  E. Particularités à gérer (état final)
+
+  ┌──────────────────────────────────────┬──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │                  Cas                 │                                                  Traitement                                                      │
+  ├──────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Extension .grb2 vs .grib2            │ Glob avec *.grb2 *.grib2 ; même structure miroir conservée dans le subset                                        │
+  ├──────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Fenêtre temporelle 32@4h vs 31@4h    │ Pattern [0-9]+@4 hour pour absorber les deux conventions (CFSv2 ≥ 2022 utilise 31@4h)                            │
+  ├──────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Records aux dates incompatibles      │ wgrib2 -set_date -set_ftime "0-1 day ave fcst" avant -netcdf                                                     │
+  ├──────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Pondération cos(lat)                 │ Critique : sans ça, T2m global biaisée de plusieurs K (sur-pondération polaire)                                  │
+  ├──────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ terra non installable                │ Remplacé par ncdf4 (R lib pure, pas de dépendance GDAL)                                                          │
+  ├──────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Saut CFSR → CFSv2 en jan 2011        │ Détecté sur 17/21 vars (phase 3) → version homogénéisée disponible                                               │
+  └──────────────────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  F. Bilan de la phase 2
+
+  Pipeline complet exécuté en ~12 minutes au total :
+
+  ┌──────────────────────────────┬─────────────────────────────────────────┬──────────────┐
+  │            Script            │                  Rôle                   │    Durée     │
+  ├──────────────────────────────┼─────────────────────────────────────────┼──────────────┤
+  │ 15_extract_grib_subset.sh    │ source 3.5 Go → subset GRIB 172 Mo      │ 1 min        │
+  ├──────────────────────────────┼─────────────────────────────────────────┼──────────────┤
+  │ 01_extract_subset.sh         │ subset GRIB → NetCDF (564 fichiers)     │ 16 sec       │
+  ├──────────────────────────────┼─────────────────────────────────────────┼──────────────┤
+  │ 02_global_means.R            │ Moyennes globales pondérées cos(lat)    │ 10 min 8 sec │
+  ├──────────────────────────────┼─────────────────────────────────────────┼──────────────┤
+  │ 03_validation.R              │ Sanity checks + 4 plots + CRE           │ < 30 sec     │
+  ├──────────────────────────────┼─────────────────────────────────────────┼──────────────┤
+  │ 04_merge_with_co2.R          │ Fusion CO2 + corrélations brutes        │ < 30 sec     │
+  └──────────────────────────────┴─────────────────────────────────────────┴──────────────┘
+
+  Données produites dans outputs/
+
+  ┌───────────────────────────────────────┬────────────┬──────────────────────────────────────────────┐
+  │                Fichier                │ Dimensions │                   Contenu                    │
+  ├───────────────────────────────────────┼────────────┼──────────────────────────────────────────────┤
+  │ monthly_global_means_25.csv           │ 564 × 21   │ year, month, date, 18 variables climatiques  │
+  ├───────────────────────────────────────┼────────────┼──────────────────────────────────────────────┤
+  │ cre_monthly_25.csv                    │ 564 × 6    │ Cloud Radiative Effects (SW/LW/net)          │
+  ├───────────────────────────────────────┼────────────┼──────────────────────────────────────────────┤
+  │ climate_co2_monthly.csv               │ 564 × 26   │ Tableau master pour les phases 3 et 4        │
+  ├───────────────────────────────────────┼────────────┼──────────────────────────────────────────────┤
+  │ correlations_brut.csv                 │ 21 × 2     │ Corrélations Pearson brutes climat ↔ CO2     │
+  ├───────────────────────────────────────┼────────────┼──────────────────────────────────────────────┤
+  │ plots/01_series_18_variables.png      │ —          │ Toutes les séries temporelles                │
+  ├───────────────────────────────────────┼────────────┼──────────────────────────────────────────────┤
+  │ plots/02_cloud_radiative_effects.png  │ —          │ CRE_SW, CRE_LW, CRE_net                      │
+  ├───────────────────────────────────────┼────────────┼──────────────────────────────────────────────┤
+  │ plots/03_transition_cfsr_cfsv2.png    │ —          │ Continuité 2008-2013 (4 vars témoins)        │
+  ├───────────────────────────────────────┼────────────┼──────────────────────────────────────────────┤
+  │ plots/04_climatologie_saisonniere.png │ —          │ Cycle saisonnier moyen                       │
+  ├───────────────────────────────────────┼────────────┼──────────────────────────────────────────────┤
+  │ plots/05_correlations_brut.png        │ —          │ Corrélations brutes (premier ordre)          │
+  └───────────────────────────────────────┴────────────┴──────────────────────────────────────────────┘
+
+  Sanity checks — 18/18 OK ✓
+
+  Toutes les variables sont dans leurs plages climatologiques attendues. CRE net = −19.7 W/m² (consensus IPCC ≈ −20 W/m²). PRMSL = 1011 hPa, T2m = 288 K, PWAT = 25 kg/m², TCDC = 60 %, ALBDO = 11 % — toutes cohérentes.
+
+  Premières corrélations brutes (à interpréter avec prudence — phase 3 démontre que beaucoup sont fallacieuses)
+
+  ┌──────────┬────────────────────────────────────────────────────────────────────────┐
+  │ Variable │                              r (brut)                                  │
+  ├──────────┼────────────────────────────────────────────────────────────────────────┤
+  │ TCDC     │ +0.76 (largement amplifié par le saut CFSR/CFSv2 en jan 2011)          │
+  ├──────────┼────────────────────────────────────────────────────────────────────────┤
+  │ CRE_LW   │ −0.68 (idem, lié au saut TCDC)                                         │
+  ├──────────┼────────────────────────────────────────────────────────────────────────┤
+  │ PWAT     │ +0.53 (vapeur d'eau, signal Clausius-Clapeyron — robuste à la phase 3) │
+  ├──────────┼────────────────────────────────────────────────────────────────────────┤
+  │ APCP     │ +0.51 (précipitations)                                                 │
+  ├──────────┼────────────────────────────────────────────────────────────────────────┤
+  │ SPFH2m   │ +0.42 (humidité spécifique — robuste à la phase 3)                     │
+  └──────────┴────────────────────────────────────────────────────────────────────────┘
+
+  T2m globale ne donne que r = +0.17 sur les niveaux bruts — résultat connu et attendu : la trend CO2 est presque linéaire alors que la T2m globale montre un "hiatus" 1998-2014. Les phases 3 et 4 désaisonnent et détendent les séries pour obtenir les vraies corrélations sur les anomalies.
+
+  G. Liens vers les phases suivantes
+
+  - Phase 2 bis (analyse par variable)  : voir Climat_report.html section 4 + outputs/per_variable/
+  - Phase 3 (robustesse, saut CFSR/v2) : voir Climat_report.html section 5 + outputs/cfsr_to_cfsv2_jumps.csv
+  - Phase 4 (corrélations climat ↔ CO2): voir Climat_report.html section 6 + outputs/correlations_4repr.csv

@@ -1,0 +1,19 @@
+var,level,CFSR_1979_01,CFSR_2000_01,CFSv2_2011_01,CFSv2_2024_12,all_match
+ALBDO,"surface",var0_2_1_7_19_1,var0_2_1_7_19_1,var0_2_1_7_19_1,var0_2_1_7_19_1,YES
+APCP,"surface",var0_2_1_7_1_8,var0_2_1_7_1_8,var0_2_1_7_1_8,var0_2_1_7_1_8,YES
+CDUVB,"surface",var0_2_1_7_4_195,var0_2_1_7_4_195,var0_2_1_7_4_195,var0_2_1_7_4_195,YES
+CSDLF,"surface",var0_2_1_7_5_196,var0_2_1_7_5_196,var0_2_1_7_5_196,var0_2_1_7_5_196,YES
+CSDSF,"surface",var0_2_1_7_4_196,var0_2_1_7_4_196,var0_2_1_7_4_196,var0_2_1_7_4_196,YES
+CSULF,"surface",var0_2_1_7_5_195,var0_2_1_7_5_195,var0_2_1_7_5_195,var0_2_1_7_5_195,YES
+CSUSF,"surface",var0_2_1_7_4_198,var0_2_1_7_4_198,var0_2_1_7_4_198,var0_2_1_7_4_198,YES
+DLWRF,"surface",var0_2_1_7_5_192,var0_2_1_7_5_192,var0_2_1_7_5_192,var0_2_1_7_5_192,YES
+DSWRF,"surface",var0_2_1_7_4_192,var0_2_1_7_4_192,var0_2_1_7_4_192,var0_2_1_7_4_192,YES
+DUVB,"surface",var0_2_1_7_4_194,var0_2_1_7_4_194,var0_2_1_7_4_194,var0_2_1_7_4_194,YES
+PRMSL,"mean sea level",var0_2_1_7_3_1,var0_2_1_7_3_1,var0_2_1_7_3_1,var0_2_1_7_3_1,YES
+PWAT,"entire atmosphere (considered as a single layer)",var0_2_1_7_1_3,var0_2_1_7_1_3,var0_2_1_7_1_3,var0_2_1_7_1_3,YES
+SPFH,"2 m above ground",var0_2_1_7_1_0,var0_2_1_7_1_0,var0_2_1_7_1_0,var0_2_1_7_1_0,YES
+TCDC,"entire atmosphere (considered as a single layer)",var0_2_1_7_6_1,var0_2_1_7_6_1,var0_2_1_7_6_1,var0_2_1_7_6_1,YES
+TMP,"2 m above ground",var0_2_1_7_0_0,var0_2_1_7_0_0,var0_2_1_7_0_0,var0_2_1_7_0_0,YES
+TMP,"500 mb",var0_2_1_7_0_0,var0_2_1_7_0_0,var0_2_1_7_0_0,var0_2_1_7_0_0,YES
+ULWRF,"surface",var0_2_1_7_5_193,var0_2_1_7_5_193,var0_2_1_7_5_193,var0_2_1_7_5_193,YES
+USWRF,"surface",var0_2_1_7_4_193,var0_2_1_7_4_193,var0_2_1_7_4_193,var0_2_1_7_4_193,YES

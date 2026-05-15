@@ -1,0 +1,546 @@
+# Vostok - Isotope and Gas Data and Temperature Reconstruction
+#----------------------------------------------------------------------- 
+#                World Data Service for Paleoclimatology, Boulder 
+#                                  and 
+#                     NOAA Paleoclimatology Program 
+#             National Centers for Environmental Information (NCEI)
+#----------------------------------------------------------------------- 
+# Template Version 4.0
+# Encoding: UTF-8
+# NOTE: Please cite original publication, NOAA Landing Page URL, dataset and publication DOIs (where available), and date accessed when using downloaded data. If there is no publication information, please cite investigator, study title, NOAA Landing Page URL, and date accessed. 
+#
+# Description/Documentation lines begin with #
+# Data lines have no #
+#
+# NOAA_Landing_Page:  https://www.ncei.noaa.gov/access/paleo-search/study/2453
+#   Landing_Page_Description: NOAA Landing Page of this file's parent study, which includes all study metadata.
+#
+# Study_Level_JSON_Metadata: https://www.ncei.noaa.gov/pub/data/metadata/published/paleo/json/noaa-icecore-2453.json
+#   Study_Level_JSON_Description: JSON metadata of this data file's parent study, which includes all study metadata.
+#
+# Data_Type: Ice cores
+#
+# Dataset_DOI: 10.25921/kcry-ae86
+#
+# Science_Keywords: Air Temperature Reconstruction 
+#--------------------
+# Resource_Links
+#   
+# Data_Download_Resource: https://www.ncei.noaa.gov/pub/data/paleo/icecore/antarctica/vostok/co2nat-noaa.txt
+#   Data_Download_Description: NOAA Template File; Atmospheric Carbon Dioxide Data
+#
+#--------------------
+# Contribution_Date
+#    Date: 2001-11-01
+#--------------------
+# File_Last_Modified_Date
+#     Date: 2025-06-25
+#--------------------
+# Title
+#   Study_Name: Vostok - Isotope and Gas Data and Temperature Reconstruction
+#--------------------
+# Investigators
+#   Investigators: Petit, J.-R.; Jouzel, J.; Raynaud, D.; Barkov, N.I.; Barnola, J.M.; Basile, I.; Bender, M.L.; Chappellaz, J.A.; Davis, M.; Delaygue, G.; Delmotte, M.; Kotlyakov, V.M.; Legrand, M.; Lipenkov, V.Y.; Lorius, C.; Pépin, L.; Ritz, C.; Saltzman, E.S.; Stievenard, M.
+#--------------------
+# Description_Notes_and_Keywords
+#   Description: 
+#--------------------
+# Publication 
+#   Authors: Petit, J.-R., J. Jouzel, D. Raynaud, N.I. Barkov, J.-M. Barnola, I. Basile, M. Bender, J. Chappellaz, M. Davis, G. Delaygue, M. Delmotte, V.M. Kotlyakov, M. Legrand, V. Lipenkov, C. Lorius, L. Pépin, C. Ritz, E. Saltzman, and M. Stievenard
+#   Published_Date_or_Year: 1999-06-03
+#   Published_Title: Climate and atmospheric history of the past 420,000 years from the Vostok Ice Core, Antarctica
+#   Journal_Name: Nature
+#   Volume: 399
+#   Edition: 
+#   Issue: 
+#   Pages: 429–436
+#   Report_Number: 
+#   DOI: 10.1038/20859
+#   Online_Resource: 
+#   Full_Citation:
+#   Abstract: The recent completion of drilling at Vostok station in East Antarctica has allowed the extension of the ice record of atmospheric composition and climate to the past four glacial–interglacial cycles. The succession of changes through each climate cycle and termination was similar, and atmospheric and climate properties oscillated between stable bounds. Interglacial periods differed in temporal evolution and duration. Atmospheric concentrations of carbon dioxide and methane correlate well with Antarctic air-temperature throughout the record. Present-day atmospheric burdens of these two important greenhouse gases seem to have been unprecedented during the past 420,000 years.
+#--------------------
+# Publication 
+#   Authors: Barnola, J.-M., D. Raynaud, Y.S. Korotkevich, C. Lorius
+#   Published_Date_or_Year: 1987-10-01
+#   Published_Title: Vostok ice core provides 160,000-year record of atmospheric CO2
+#   Journal_Name: Nature
+#   Volume: 329
+#   Edition: 
+#   Issue: 
+#   Pages: 408-414
+#   Report_Number: 
+#   DOI: 10.1038/329408a0
+#   Online_Resource: 
+#   Full_Citation:
+#   Abstract: Direct evidence of past atmospheric CO2 changes has been extended to the past 160,000 years from the Vostok ice core. These changes are most notably an inherent phenomenon of change between glacial and interglacial periods. Besides this major 100,000-year cycle, the CO2 record seems to exhibit a cyclic change with a period of some 21,000 years.
+#--------------------
+# Publication 
+#   Authors: Barnola, J.-M., P. Pimienta, D. Raynaud, Y.S. Korotkevich
+#   Published_Date_or_Year: 1991
+#   Published_Title: CO2 climate relationship as deduced from the Vostok ice core: a re-examination based on new measurements and on a re-evaluation of the air dating
+#   Journal_Name: Tellus
+#   Volume: 43B
+#   Edition: 
+#   Issue: 2
+#   Pages: 83-90
+#   Report_Number: 
+#   DOI: 10.3402/tellusb.v43i2.15249
+#   Online_Resource: 
+#   Full_Citation:
+#   Abstract: Interpretation of the past CO2 variations recorded in polar ice during the large climatic transitions requires an accurate determination of the airice age difference. For the Vostok core, the age differences resulting from different assumptions on the firn densification process are compared and a new procedure is proposed to date the air trapped in this core. The penultimate deglaciation is studied on the basis of this new air dating and new CO2 measurements. These measurements and results obtained on other ice cores indicate that at the beginning of the deglaciations, the CO2 increase is either in phase or lags by less than about 1000 years with respect to the Antarctic temperature, while it clearly lags the temperature at the onset of the last glaciation.
+#--------------------
+# Publication 
+#   Authors: Chappellaz, J., J.-M. Barnola, D. Raynaud, Y.S. Korotkevich, C. Lorius
+#   Published_Date_or_Year: 1990-05-10
+#   Published_Title: Ice-core record of atmospheric methane over the past 160,000 years
+#   Journal_Name: Nature
+#   Volume: 345
+#   Edition: 
+#   Issue: 
+#   Pages: 127-131
+#   Report_Number: 
+#   DOI: 10.1038/345127a0
+#   Online_Resource: 
+#   Full_Citation:
+#   Abstract: Methane measurements along the Vostok ice core reveal substantial changes over the past 160,000 years which are associated with climate fluctuations. These results point to changes in sources of methane and also show that methane has probably contributed, like carbon dioxide, to glacial-interglacial temperature changes.
+#--------------------
+# Publication 
+#   Authors: Jouzel J., C. Lorius, J.-R. Petit, C. Genthon, N.I. Barkov, V.M. Kotlyakov, V.M. Petrov
+#   Published_Date_or_Year: 1987-10-01
+#   Published_Title: Vostok ice core: a continuous isotope temperature record over the last climatic cycle (160,000 years)
+#   Journal_Name: Nature
+#   Volume: 329
+#   Edition: 
+#   Issue: 
+#   Pages: 403-408
+#   Report_Number: 
+#   DOI: 10.1038/329403a0
+#   Online_Resource: 
+#   Full_Citation:
+#   Abstract: A continuous deuterium profile along the 160,000-year Vostok ice core (Antarctica) is interpreted in terms of atmospheric temperature changes. This climatic record is the awaited terrestrial complement of the deep-sea records supporting the existence of a relation between the Pleistocene climate and orbital forcing.
+#--------------------
+# Publication 
+#   Authors: Jouzel J., N.I. Barkov, J.-M. Barnola, M. Bender, J. Chappellaz, C. Genthon, V.M. Kotlyakov, V. Lipenkov, C. Lorius, J.-R. Petit, D. Raynaud, G. Raisbeck, C. Ritz, T. Sowers, M. Stievenard, F. Yiou, P. Yiou
+#   Published_Date_or_Year: 1993-07-29
+#   Published_Title: Extending the Vostok ice-core record of paleoclimate to the penultimate glacial period
+#   Journal_Name: Nature
+#   Volume: 364
+#   Edition: 
+#   Issue: 
+#   Pages: 407-412
+#   Report_Number: 
+#   DOI: 10.1038/364407a0
+#   Online_Resource: 
+#   Full_Citation:
+#   Abstract: The ice-core record of local temperature, dust accumulation and air composition at Vostok station, Antarctica, now extends back to the penultimate glacial period (~140–200 kyr ago) and the end of the preceding interglacial. This yields a new glaciological timescale for the whole record, which is consistent with ocean records. Temperatures at Vostok appear to have been more uniformly cold in the penultimate glacial period than in the most recent one. Concentrations of CO2 and CH4 correlate well with temperature throughout the record.
+#--------------------
+# Publication 
+#   Authors: Jouzel J., C. Waelbroeck, B. Malaizé, M. Bender, J.-R. Petit, N.I. Barkov, J.-M. Barnola, T. King, V.M. Kotlyakov, V. Lipenkov, C. Lorius, D. Raynaud, C. Ritz, T. Sowers
+#   Published_Date_or_Year: 1996-06-01
+#   Published_Title: Climatic interpretation of the recently extended Vostok ice records
+#   Journal_Name: Climate Dynamics
+#   Volume: 12
+#   Edition: 
+#   Issue: 
+#   Pages: 513-521
+#   Report_Number: 
+#   DOI: 10.1007/BF00207935
+#   Online_Resource: 
+#   Full_Citation:
+#   Abstract: A new ice core drilled at the Russian station of Vostok in Antarctica reached 2755 m depth in September 1993. At this depth, the glaciological time scale provides an age of 260 ky BP (±25). We refine this estimate using records of dust and deuterium in the ice and of δ18O of O2 in the entrapped air. δ18O of O2 is highly correlated with insolation over the last two climatic cycles if one assumes that the EGT chronology overestimates the increase of age with depth by 12% for ages older than 112 ky BP. This modified age-depth scale gives an age of 244 ky BP at 2755 m depth and agrees well with the age-depth scale of Walbroeck et al. (in press) derived by orbital tuning of the Vostok δD record. We discuss the temperature interpretation of this latter record accounting for the influence of the origin of the ice and using information derived from deuterium-excess data. We conclude that the warmest period of stage 7 was likely as warm as today in Antarctica. A remarkable feature of the Vostok record is the high level of similarity of proxy temperature records for the last two climatic cycles (stages 6 and 7 versus stages 1–5). This similarity has no equivalent in other paleorecords.
+#--------------------
+# Publication 
+#   Authors: Legrand M., C. Lorius, N.I. Barkov, V.N. Petrov
+#   Published_Date_or_Year: 1988
+#   Published_Title: Vostok (Antarctica) ice core: atmospheric chemistry changes over the last climatic cycle (160,000 years)
+#   Journal_Name: Atmospheric Environment
+#   Volume: 22
+#   Edition: 
+#   Issue: 2
+#   Pages: 317-331
+#   Report_Number: 
+#   DOI: 10.1016/0004-6981(88)90037-6 
+#   Online_Resource: 
+#   Full_Citation:
+#   Abstract: A 2083 m deep ice core from Vostok Station (East Antarctica) has been used for a comprehensive study of all major ions (i.e. Na+, NH4+, K+, Ca2+, Mg2+, H+, Cl−, NO3− and SO42− originating from aerosols deposited over the last climatic cycle (160,000 a), as depicted from the isotopic composition of the ice. For the first time in deep ice core studies, a good balance between anions and cations is obtained throughout the profile. This allows the clear identification of marine salts (i.e. sea salt and Na2SO4), terrestrial salts (calcium and magnesium associated with nitrates and sulfates) and strong mineral acids (HNO3, H2SO4 and HCl). Concentration profiles confirm that both marine and terrestrial aerosol inputs were higher during cold climatic conditions (from 110 to 15 ka B.P.) than during the Last Interglacial (centered around 130 ka B.P.) and the Holocene (the last 10,000 a) stages. High concentration peaks (up to 5 and 30 times the Holocene values of marine and terrestrial contents, respectively) are in particular observed during the very cold climate characterizing the end of the penultimate glacial age (~ 160 ka B.P.) and the Last Glacial Maximum which terminated around 15 ka B.P. These peaks reflect strengthened sources and transport during full glacial conditions, linked to higher wind speeds, more extensive arid areas on the continents and the greater exposure of continental shelves. More generally, marine and terrestrial aerosol concentrations measured in ice are strongly affected by climatic conditions of global (source strength and atmospheric transport efficiency) and local (rate of snow accumulation) concern. As opposed to marine and terrestrial inputs, acidic gas-derived impurity concentrations (HNO3, H2SO4) remain relatively stable over the whole climatic cycle. In particular there is no correlation between observed H2SO4 fluctuations and the isotope-temperature profile. This would indicate the absence of a long-term relationship between volcanism and climate. The mineral acid contribution represents a large part (over 50%) of ice impurities deposited during interglacial periods. For glacial ice the contribution of marine and terrestrial salts becomes preponderant (up to 75% of total soluble impurities). During interglacial stages and the relatively warm periods of the Last Glacial Age, significant quantities of either Na2SO4 or HCl are found, possibly resulting from marine aerosol alteration during atmospheric transport from sea sources towards Antarctica. On the other hand, the Cl/Nam ratio values indicate the presence of non-fractionated marine aerosols during full glacial conditions, confirming faster transport from sea sources towards Antarctica.
+#--------------------
+# Publication 
+#   Authors: Lorius C., J. Jouzel, C. Ritz, L. Merlivat, N.I. Barkov, Y.S. Korotkevitch, V.M. Kotlyakov
+#   Published_Date_or_Year: 1985-08-01
+#   Published_Title: A 150,000-year climatic record from Antarctic ice
+#   Journal_Name: Nature
+#   Volume: 316
+#   Edition: 
+#   Issue: 
+#   Pages: 591-596
+#   Report_Number: 
+#   DOI: 10.1038/316591a0
+#   Online_Resource: 
+#   Full_Citation:
+#   Abstract: During much of the Quaternary, the Earth's climate has undergone drastic changes most notably successive glacial and interglacial episodes. The past 150 kyr includes such a climatic cycle: the last interglacial, the last glacial and the present holocene interglacial. A new climatic–time series for this period has been obtained using δ18 O data from an Antarctic ice core.
+#--------------------
+# Publication 
+#   Authors: Petit J.-R., L. Mourner, J. Jouzel, Y. Korotkevitch, V. Kotlyakov, C. Lorius
+#   Published_Date_or_Year: 1990-01-04
+#   Published_Title: Paleoclimatological implications of the Vostok core dust record
+#   Journal_Name: Nature
+#   Volume: 343
+#   Edition: 
+#   Issue: 
+#   Pages: 56-58
+#   Report_Number: 
+#   DOI: 10.1038/343056a0
+#   Online_Resource: 
+#   Full_Citation:
+#   Abstract: The 2,083-m Vostok ice core recovered by the Soviet Antarctic expeditions has provided much information of climatic and environmental interest, for a period covering a full glacial–interglacial cycle. Here we present and discuss the dust record obtained down to 2,202 m, the final depth to which this core was extended in 1986. First, we document the fact that major changes in aeolian deposits, as recorded in the Vostok core, appear to be of global significance and confirm the existence of a link between high-latitude aeolian deposits and the Earth's orbital parameters. Second, we propose atmospheric dust as a stratigraphic marker to compare timing with other records of palaeoclimate, and use the magnetic-susceptibility profile measured along the RC11-120 Indian Ocean core for this purpose, assuming that major dust events correspond to common aeolian inputs. This approach indicates that the Vostok and marine records were roughly in phase at the previous glacial–interglacial transition.
+#--------------------
+# Publication 
+#   Authors: Sowers T., M. Bender, L.D. Labeyrie, J. Jouzel, D. Raynaud, D. Martinson, Y.S. Korotkevich
+#   Published_Date_or_Year: 1993-12-01
+#   Published_Title: 135,000 year Vostok - SPECMAP common temporal framework
+#   Journal_Name: Paleoceanography
+#   Volume: 8
+#   Edition: 
+#   Issue: 6
+#   Pages: 737-766
+#   Report_Number: 
+#   DOI: 10.1029/93PA02328
+#   Online_Resource: 
+#   Full_Citation:
+#   Abstract: The object of the present study is to introduce a means of comparing the Vostok and marine chronologies. Our strategy has been to use the δ18O of atmospheric O2 (denoted δ18Oatm) from the Vostok ice core as a proxy for the δ18O of seawater (denoted δ18Osw). Our underlying premise in using δ18Oatm as a proxy for δ18Osw is that past variations in δ18Osw (an indicator of continental ice volume) have been transmitted to the atmospheric O2 reservoir by photosynthesizing organisms in the surface waters of the world's oceans. We compare our record of δ18Oatm to the δ18Osw record which has been developed from studies of the isotopic composition of biogenic calcite (δ18Oforam) in deep-sea cores. We have tied our δ18Oatm record from Vostok to the SPECMAP timescale throughout the last 135 kyr by correlating δ18Oatm with a δ18Osw record from V19-30. Results of the correlation indicate that 77% of the variance is shared between these two records. We observed differences between the δ18Oatm and the δ18Osw records during the coldest periods, which indicate that there have been subtle changes in the factors which regulate δ18Oatm other than δ18Osw. Our use of δ18Oatm as a proxy for δ18Osw must therefore be considered tentative, especially during these periods. By correlating δ18Oatm with δ18Osw, we provide a common temporal framework for comparing phase relationships between atmospheric records (from ice cores) and oceanographic records constructed from deep-sea cores. Our correlated age-depth relation for the Vostok core should not be considered an absolute Vostok timescale. We consider it to be the preferred timescale for comparing Vostok climate records with marine climate records which have been placed on the SPECMAP timescale. We have examined the fidelity of this common temporal framework by comparing sea surface temperature (SST) records from sediment cores with an Antarctic temperature record from the Vostok ice core. We have demonstrated that when the southern ocean SST and Antarctic temperature records are compared on this common temporal framework, they show a high degree of similarity. We interpret this result as supporting our use of the common temporal framework for comparing other climate records from the Vostok ice core with any climate record that has been correlated into the SPECMAP chronology.
+#--------------------
+# Funding_Agency 
+#   Funding_Agency_Name: US National Science Foundation
+#   Grant: 
+#--------------------
+# Funding_Agency 
+#   Funding_Agency_Name: Fondation de France Ars Cuttoli
+#   Grant:
+#--------------------
+# Funding_Agency 
+#   Funding_Agency_Name: Ministry of Science and Higher Education of Russia
+#   Grant:
+#--------------------
+# Site_Information 
+#   Site_Name: Vostok
+#   Location: Antarctica
+#   Northernmost_Latitude: -78.47
+#   Southernmost_Latitude: -78.47
+#   Easternmost_Longitude: 106.8
+#   Westernmost_Longitude: 106.8
+#   Elevation_m: 3488
+#--------------------
+# Data_Collection  
+#   Collection_Name: Vostok CO2 Petit1999
+#   First_Year: 414085
+#   Last_Year: 2342
+#   Time_Unit: cal yr BP
+#   Core_Length_m: 
+#   Parameter_Keywords: atmospheric gas
+#   Notes: CO2 and CH4 measurements have been performed using the methods and analytical procedures previously described (Barnola et al., 1987, Chappellaz et al, 1990). However, the CO2 measuring system has been slightly modified in order to increase the sensitivity of the CO2 detection. The thermal conductivity chromatographic detector has been replaced by a flame ionisation detector which measures CO2 after its transformation into CH4. The overall accuracy for CH4 and CO2 measurements are ± 20 ppbv and 2-3 ppmv respectively. No gravitational correction has been applied.
+#--------------------
+# Chronology_Information
+#   Chronology: 
+#
+#--------------------
+# Variables  
+#
+# PaST_Thesaurus_Download_Resource:  https://www.ncei.noaa.gov/access/paleo-search/skos/past-thesaurus.rdf
+#   PaST_Thesaurus_Download_Description: Paleoenvironmental Standard Terms (PaST) Thesaurus terms, definitions, and relationships in SKOS format.
+#
+# Variables format: Short_name <tab> what,material,error,units,seasonality,data_type,detail,method,data_format,additional_information
+#  Note: the Short_name does not require a PaST term.
+#
+## gas_ageBP	gas age,,,calendar year before present,,ice cores;climate forcing,,,N,deduced from the Barnola et al. (1991) model
+## CO2	carbon dioxide,bulk atmosphere,,parts per million,,ice cores;climate forcing,,ion chromatography;wet extraction,N,no gravitational correction
+#
+#--------------------
+# Data:
+# Data lines follow (have no #)
+# Data line format - tab-delimited text, variable short name as header
+# Missing_Values:
+gas_ageBP	CO2
+2342	284.7
+3634	272.8
+3833	268.1
+6220	262.2
+7327	254.6
+8113	259.6
+10123	261.6
+11013	263.7
+11326	244.8
+11719	238.3
+13405	236.2
+13989	225.3
+17695	182.2
+19988	189.2
+22977	191.6
+26303	188.5
+27062	191.7
+31447	205.4
+33884	209.1
+39880	209.1
+44766	189.3
+47024	188.4
+48229	210.1
+49414	215.7
+51174	190.4
+57068	221.8
+57799	210.4
+63687	195.4
+65701	191.4
+66883	195
+72849	227.4
+75360	229.2
+78995	217.1
+80059	221.8
+82858	231
+84929	241.1
+85727	236.4
+86323	228.1
+87180	214.2
+88051	217
+89363	208
+91691	224.3
+92460	228.4
+95349	232.1
+99842	225.9
+100833	230.9
+101829	236.9
+103372	228.2
+105213	236.9
+106203	230.7
+108308	238.2
+108994	245.7
+110253	251.3
+111456	256.8
+112577	266.3
+113472	261.4
+114082	274.6
+114738	273.3
+116175	262.5
+117519	267.6
+118396	273.8
+119273	272
+120002	265.2
+120652	277.7
+121961	272.2
+122606	276.5
+123815	268.7
+123858	266.6
+124306	266.3
+124571	279.8
+124876	277.2
+125746	273.8
+126023	267.1
+126475	262.5
+126809	262.6
+127445	275.4
+128300	274.1
+128399	287.1
+128652	286.8
+129007	282.7
+129411	264.1
+129755	263.4
+130167	259
+131789	240.4
+133334	224
+134205	208.9
+135003	204.6
+135683	198.1
+135976	201.8
+136359	202.5
+136659	195.9
+137383	194.4
+137694	193.4
+138226	190.2
+139445	192.3
+141312	196.5
+142357	190.4
+145435	197
+150303	191.9
+154471	189
+155299	185.5
+160494	204.4
+162996	191.6
+165278	183.8
+169870	197.9
+172596	197.8
+175440	190.3
+176271	190.1
+178550	207.7
+180779	213.2
+181617	217.7
+183355	199.8
+185063	203.5
+187199	210.7
+189335	231.4
+191057	231.5
+192632	218
+195625	220.1
+199025	242.6
+202212	251
+203191	239.1
+204283	247.7
+205148	244.4
+205715	232.2
+206119	228.7
+207991	238.2
+209414	242.2
+210022	244.6
+210830	247.3
+211005	252
+212281	257.4
+214153	251.2
+215041	241.4
+215593	240.3
+215879	242.7
+216459	247.5
+217009	251.7
+217271	251.2
+217676	245.4
+218342	240.5
+219680	212.2
+220182	216.2
+220760	207.2
+221054	208.9
+221612	205.7
+222958	203.4
+223446	215.7
+224630	236.9
+225299	234.5
+225509	233.1
+225888	224.5
+226710	232.4
+227384	233.9
+227840	241.7
+230703	245.2
+231382	252.2
+231990	241.4
+232570	247.4
+233102	243.1
+233646	239.2
+234126	245.7
+234470	245.9
+234781	247.4
+235213	252.9
+236236	259.8
+237831	279
+238935	263.8
+239250	252.4
+239545	249.9
+240201	230.4
+240577	219.4
+242068	214.7
+243653	200.2
+244215	213.9
+244863	195.4
+245483	196.7
+247447	199
+248087	201.9
+248980	204
+250461	203.9
+251521	209.7
+252959	208.9
+253880	214.7
+255233	228.2
+256053	199.9
+256501	211.7
+257247	188.7
+258477	194.2
+259228	198.9
+259958	184.7
+260754	190.4
+261595	193.9
+262411	194.2
+263207	198.4
+264046	193.2
+264834	202.2
+266492	211
+267434	215.4
+268679	223.7
+270680	231.4
+273012	226.4
+274445	230.4
+275218	231
+277925	220.4
+278602	217.2
+279543	207.7
+282301	212.7
+283492	213.2
+286217	224.4
+287846	236.2
+290571	240.2
+291769	240.7
+292474	250.2
+293676	244.9
+294615	225.9
+295849	227.9
+297131	233.2
+298051	237.9
+299020	239
+299877	241.9
+300646	251.7
+301496	256.8
+302456	257.2
+303334	246.9
+303953	272.7
+304590	251.7
+305306	244.7
+307131	255.9
+308101	249.2
+310039	256.3
+310930	260.4
+311774	260.3
+313493	266.3
+315143	266.2
+315940	270.2
+316681	271.9
+317445	275.2
+318980	265
+319754	271.8
+320378	272.7
+321386	273.2
+322111	282.4
+322582	289.2
+322827	288.4
+323485	298.7
+324189	278.2
+324991	285.8
+325527	278.7
+326239	270.5
+327114	255.7
+328097	241.9
+329267	239.7
+330208	234.2
+332293	250.2
+333627	200.7
+335290	205.2
+336972	204.9
+340165	220.4
+342998	221.2
+344735	216.2
+347610	209.2
+350765	193
+352412	186.2
+356838	201.2
+359688	206.4
+362766	201.9
+366221	214.7
+369563	229.7
+373014	227
+374561	240
+378194	246.9
+379633	245.9
+384909	264.7
+386579	259.3
+390589	255.2
+392451	250.2
+394628	266.3
+396713	274.7
+400390	278
+405844	279.7
+409022	283.7
+410831	276.3
+414085	285.5

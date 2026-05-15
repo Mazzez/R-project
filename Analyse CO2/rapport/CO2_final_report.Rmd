@@ -35,7 +35,7 @@ suppressPackageStartupMessages({
 
 Sys.setenv(X13_PATH = x13binary::x13path())
 
-data_dir <- "/home/mazzez/Bureau/R project/Data/CO2"
+data_dir <- "/home/mazzez/Bureau/R project/Final Version/CO2"
 theme_set(theme_minimal(base_size = 12))
 ```
 
@@ -108,7 +108,7 @@ cat(sprintf("Hausse totale : %.2f ppm sur %.2f ans (~%.3f ppm/an)\n",
 
 ## Section 3 : Décomposition saisonnière (STL)
 
-```{r s03-stl, fig.height=8}
+```{r s03-stl, fig.height=5}
 co2_ts <- ts(co2$average, start = c(co2$year[1], co2$month[1]), frequency = 12)
 stl_fit <- stl(co2_ts, s.window = "periodic", robust = TRUE)
 stl_df  <- as.data.frame(stl_fit$time.series) |>

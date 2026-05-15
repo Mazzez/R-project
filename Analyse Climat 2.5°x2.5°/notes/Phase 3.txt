@@ -1,0 +1,188 @@
+Phase 3 — Robustesse à l'homogénéisation CFSR / CFSv2
+
+  A. Objectif
+
+  L'inspection visuelle des courbes brutes (phase 2) révèle qu'un saut apparaît au passage 2010 → 2011 sur de nombreuses variables, ce qui correspond à la transition entre les deux produits NCEP/NCAR :
+  - CFSR (1979-2010, fichiers .grb2)
+  - CFSv2 (2011-2025, fichiers .grib2)
+
+  Avant d'attribuer ce saut à un changement physique, il faut prouver qu'on extrait bien la même quantité physique des deux côtés. Si oui, on doit ensuite quantifier le saut, le retirer (homogénéisation), et vérifier l'impact attendu sur les corrélations de la phase 4.
+
+  B. Vérification : mêmes codes GRIB2 dans CFSR et CFSv2 (14_verify_grib_codes.sh)
+
+  Chaque record GRIB2 porte un identifiant complet de la forme :
+    var<discipline>_<table>_<…>_<category>_<param>
+  qui pointe vers une entrée précise de la table NCEP. Si deux fichiers retournent le même identifiant pour une variable donnée, c'est la preuve qu'il s'agit du même paramètre physique.
+
+  Comparaison sur 4 fichiers témoins (1979-01, 2000-01, 2011-01, 2024-12) :
+
+  ┌────────┬────────────────────────────────────────────────┬───────────────────┬──────────────┐
+  │ Var    │ Niveau                                         │ Code GRIB2        │ 4 fichiers   │
+  ├────────┼────────────────────────────────────────────────┼───────────────────┼──────────────┤
+  │ ALBDO  │ surface                                        │ var0_2_1_7_19_1   │ identiques ✓ │
+  │ APCP   │ surface                                        │ var0_2_1_7_1_8    │ identiques ✓ │
+  │ CDUVB  │ surface                                        │ var0_2_1_7_4_195  │ identiques ✓ │
+  │ CSDLF  │ surface                                        │ var0_2_1_7_5_196  │ identiques ✓ │
+  │ CSDSF  │ surface                                        │ var0_2_1_7_4_196  │ identiques ✓ │
+  │ CSULF  │ surface                                        │ var0_2_1_7_5_195  │ identiques ✓ │
+  │ CSUSF  │ surface                                        │ var0_2_1_7_4_198  │ identiques ✓ │
+  │ DLWRF  │ surface                                        │ var0_2_1_7_5_192  │ identiques ✓ │
+  │ DSWRF  │ surface                                        │ var0_2_1_7_4_192  │ identiques ✓ │
+  │ DUVB   │ surface                                        │ var0_2_1_7_4_194  │ identiques ✓ │
+  │ PRMSL  │ mean sea level                                 │ var0_2_1_7_3_1    │ identiques ✓ │
+  │ PWAT   │ entire atmosphere                              │ var0_2_1_7_1_3    │ identiques ✓ │
+  │ SPFH   │ 2 m above ground                               │ var0_2_1_7_1_0    │ identiques ✓ │
+  │ TCDC   │ entire atmosphere                              │ var0_2_1_7_6_1    │ identiques ✓ │
+  │ TMP    │ 2 m above ground                               │ var0_2_1_7_0_0    │ identiques ✓ │
+  │ TMP    │ 500 mb                                         │ var0_2_1_7_0_0    │ identiques ✓ │
+  │ ULWRF  │ surface                                        │ var0_2_1_7_5_193  │ identiques ✓ │
+  │ USWRF  │ surface                                        │ var0_2_1_7_4_193  │ identiques ✓ │
+  └────────┴────────────────────────────────────────────────┴───────────────────┴──────────────┘
+
+  Conclusion : 18/18 records ont des codes GRIB2 identiques. Le saut N'EST PAS un artefact d'extraction. Il traduit un changement réel dans le modèle atmosphérique, l'assimilation ou la paramétrisation entre CFSR et CFSv2 — différences documentées par NCEP, particulièrement marquées pour les nuages et le rayonnement net.
+
+  C. Modèle de détection du saut (12_homogenization.R)
+
+  Pour chaque variable, on ajuste un modèle additif :
+
+    X_t = a + b · t + c · 1{t ≥ 2011-01} + Σ_m s_m · 1{month(t) = m} + ε_t
+
+  - b capture la tendance climatique linéaire sous-jacente
+  - c capture le saut instantané au moment de la transition (l'effet d'intérêt)
+  - Le bloc s_m retire la saisonnalité (mois en facteur)
+
+  Le coefficient c et son IC 95 % donnent le saut estimé (test t).
+
+  D. Résultats : 17/21 variables avec saut significatif (p < 0.05)
+
+  Top 5 magnitudes en écarts-types (signé) :
+
+  ┌──────────┬──────────────┬────────────┬────────────┬───────────┐
+  │ Variable │ Saut (unité) │ Saut (%)   │ Saut (sd)  │ p-value   │
+  ├──────────┼──────────────┼────────────┼────────────┼───────────┤
+  │ CRE_LW   │ −2.04 W/m²   │ −8.0 %     │ −1.92      │ 1.27e−115 │
+  │ PRMSL    │ −26.3 Pa     │ −0.026 %   │ −1.77      │ 1.80e−56  │
+  │ CRE_SW   │ +5.14 W/m²   │ −11.4 %    │ +1.56      │ 1.61e−111 │
+  │ TCDC     │ +2.63 %      │ +4.3 %     │ +1.14      │ 2.12e−39  │
+  │ CRE_net  │ +3.10 W/m²   │ −15.7 %    │ +1.13      │ 3.27e−86  │
+  └──────────┴──────────────┴────────────┴────────────┴───────────┘
+
+  Lecture : CFSv2 produit moins d'effet de serre nuageux (CRE_LW) et moins de refroidissement par les nuages (CRE_SW magnitude diminuée), avec une couverture nuageuse totale plus importante (TCDC). Conséquence visible en jan 2011 sur quasiment toutes les courbes radiatives.
+
+  Variables peu touchées (p > 0.05 ou |saut| < 0.1 sd) :
+
+  ┌──────────┬─────────────┐
+  │ Variable │ Saut (sd)   │
+  ├──────────┼─────────────┤
+  │ APCP     │ +0.08       │ (p = 0.42, NS)
+  │ CSUSF    │ −0.02       │ (p = 0.55, NS)
+  │ T500     │ −0.04       │ (p = 0.35, NS)
+  │ PWAT     │ −0.04       │ (p = 0.34, NS)
+  └──────────┴─────────────┘
+
+  → Ces 4 variables traversent la transition sans rupture, leurs analyses sont robustes telles quelles.
+
+  E. Construction de la version homogénéisée
+
+  Pour chaque variable touchée (saut significatif), on retire le saut estimé aux observations CFSv2 (t ≥ 2011-01) :
+
+    X_homog_t = X_t − ĉ × 1{t ≥ 2011-01}
+
+  Sortie : outputs/monthly_global_means_25_homog.csv (564 × 21).
+
+  F. Avant / après homogénéisation
+
+  Sur les 4 variables les plus impactées (CRE_LW, CRE_SW, PRMSL, TCDC), la version brute montre clairement un palier visuel au passage de la ligne pointillée 2011-01-01. La version homogénéisée supprime ce palier et donne une trajectoire continue, plus fidèle au signal climatique sous-jacent.
+
+  Plot : plots/12b_before_after.png
+
+  G. Impact attendu sur la phase 4 — corrélations climat ↔ CO2 (13_phase3_homog_comparison.R)
+
+  Comparaison du R² du modèle multivarié de phase 4 (régression CO2_trend ~ 21 variables sur résidus) sur les deux versions :
+
+  ┌──────────────┬─────────────┬────────────────────┐
+  │ Modèle       │ Brute       │ Homogénéisée       │
+  ├──────────────┼─────────────┼────────────────────┤
+  │ Complet      │ 0.750       │ 0.443              │
+  │ Stepwise AIC │ 0.748       │ 0.443              │
+  └──────────────┴─────────────┴────────────────────┘
+
+  Le R² chute de 0.75 → 0.44 (−31 points). Près d'un tiers de la variance explicative apparente était portée par le saut artificiel CFSR/CFSv2.
+
+  Variations des corrélations sur résidus (phase 4) — top |Δr| :
+
+  ┌──────────┬────────────┬─────────────┬──────────┐
+  │ Variable │ r (brute)  │ r (homog.)  │ Δr       │
+  ├──────────┼────────────┼─────────────┼──────────┤
+  │ CRE_SW   │ +0.49      │ +0.05       │ −0.44    │
+  │ CRE_LW   │ −0.52      │ −0.09       │ +0.43    │
+  │ DSWRF    │ +0.44      │ +0.01       │ −0.42    │
+  │ CRE_net  │ +0.43      │ +0.01       │ −0.42    │
+  │ DUVB     │ +0.22      │ −0.15       │ −0.37    │
+  │ PRMSL    │ −0.39      │ −0.04       │ +0.35    │
+  │ TCDC     │ +0.08      │ −0.27       │ −0.35    │
+  │ DLWRF    │ −0.06      │ +0.25       │ +0.31    │  ← changement de signe
+  └──────────┴────────────┴─────────────┴──────────┘
+
+  Lecture :
+  - CRE_SW, CRE_LW, DSWRF, CRE_net, PRMSL, DUVB : corrélation brute = artefact du saut → s'effondre après correction
+  - T2m, DLWRF, ULWRF, CSULF, CSDLF, SPFH2m, PWAT, T500, APCP : corrélations stables ou renforcées → vrais signaux climatiques
+
+  H. Conséquences pour les conclusions
+
+  1. Les CRE et flux radiatifs all-sky (DSWRF, CRE_SW, CRE_LW, CRE_net) ne sont PAS des signaux interannuels propres vis-à-vis du CO2. Leur lien apparent était un artefact technique de la transition CFSR/CFSv2.
+
+  2. Les vrais signaux interannuels propres (corrélations stables ou renforcées par homogénéisation) sont :
+     - T2m, DLWRF, ULWRF, CSULF, CSDLF (signature directe de l'effet de serre)
+     - SPFH2m, PWAT, T500 (réservoir d'humidité atmosphérique, Clausius-Clapeyron)
+     - APCP (cycle hydrologique intensifié)
+     - TCDC (sa corrélation devient même plus négative après homogénéisation : −0.27)
+
+  3. R² multivarié réaliste : ~0.44 sur résidus, soit ~6 prédicteurs explicatifs équivalents (au lieu des 12 retenus sur la version brute). Le lien climat-CO2 reste multivarié et significatif, mais d'amplitude plus modeste qu'il n'y paraissait avant correction.
+
+  I. Architecture (scripts utilisés)
+
+  ┌─────────────────────────────────────────┬──────────────────────────────────────────────────┐
+  │                Script                   │                       Rôle                      │
+  ├─────────────────────────────────────────┼──────────────────────────────────────────────────┤
+  │ 14_verify_grib_codes.sh                 │ Vérifie l'identité des codes GRIB2 CFSR ↔ CFSv2  │
+  ├─────────────────────────────────────────┼──────────────────────────────────────────────────┤
+  │ 12_homogenization.R                     │ Détecte le saut + construit la version homog.   │
+  ├─────────────────────────────────────────┼──────────────────────────────────────────────────┤
+  │ 13_phase3_homog_comparison.R            │ Compare la phase 4 sur brute vs homogénéisée    │
+  └─────────────────────────────────────────┴──────────────────────────────────────────────────┘
+
+  J. Sorties produites
+
+  ┌───────────────────────────────────────────┬───────────────────────────────────────────────────┐
+  │                 Fichier                   │                     Contenu                       │
+  ├───────────────────────────────────────────┼───────────────────────────────────────────────────┤
+  │ outputs/grib_codes_verification.csv       │ Codes GRIB2 sur 4 fichiers témoins (18/18 OK)     │
+  ├───────────────────────────────────────────┼───────────────────────────────────────────────────┤
+  │ outputs/cfsr_to_cfsv2_jumps.csv           │ Saut estimé par variable (estimate, IC, p)        │
+  ├───────────────────────────────────────────┼───────────────────────────────────────────────────┤
+  │ outputs/monthly_global_means_25_homog.csv │ Version homogénéisée (saut retiré)                │
+  ├───────────────────────────────────────────┼───────────────────────────────────────────────────┤
+  │ outputs/comparison_homog_correlations.csv │ Comparaison corrélations brute vs homog.          │
+  ├───────────────────────────────────────────┼───────────────────────────────────────────────────┤
+  │ plots/12a_jumps_bar.png                   │ Saut estimé par variable (en sd)                  │
+  ├───────────────────────────────────────────┼───────────────────────────────────────────────────┤
+  │ plots/12b_before_after.png                │ Avant / après homogénéisation, 4 vars témoins     │
+  ├───────────────────────────────────────────┼───────────────────────────────────────────────────┤
+  │ plots/12c_significance_grid.png           │ Magnitude × significativité par variable          │
+  ├───────────────────────────────────────────┼───────────────────────────────────────────────────┤
+  │ plots/13a_correlations_homog_vs_brut.png  │ Scatter r_brut vs r_homog (résidus)               │
+  ├───────────────────────────────────────────┼───────────────────────────────────────────────────┤
+  │ plots/13b_R2_homog_vs_brut.png            │ R² brut vs R² homogénéisé                        │
+  └───────────────────────────────────────────┴───────────────────────────────────────────────────┘
+
+  K. Limites identifiées
+
+  - L'homogénéisation par step indicator unique est une première approximation : elle suppose que le saut est instantané et constant en magnitude. Une version plus fine modéliserait un saut dépendant du mois (interaction step × month) ou utiliserait une période de chevauchement avec ERA5 comme référence externe.
+  - Le modèle additif suppose que la tendance b est continue à travers 2011. Si la tendance climatique elle-même change de pente entre CFSR et CFSv2, le saut estimé est biaisé. Un modèle avec tendances séparées avant/après serait plus rigoureux.
+  - 4 variables (APCP, CSUSF, T500, PWAT) ne montrent pas de saut significatif → potentiellement la transition est aussi propre sur d'autres variables qu'on a corrigées par excès. Une approche bayésienne avec prior conservateur pourrait raffiner cette décision.
+
+  L. Liens vers les phases voisines
+
+  - Phase 2 (extraction)        : voir notes/Phase 2.txt
+  - Phase 4 (corrélations climat ↔ CO2) : voir notes/Phase 4.txt + Climat_report.html section 6

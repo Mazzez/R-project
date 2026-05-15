@@ -1,0 +1,574 @@
+{
+  "access": {
+    "embargo": {
+      "active": false,
+      "reason": null
+    },
+    "files": "public",
+    "record": "public",
+    "status": "open"
+  },
+  "created": "2025-10-22T14:58:09.061986+00:00",
+  "custom_fields": {},
+  "deletion_status": {
+    "is_deleted": false,
+    "status": "P"
+  },
+  "files": {
+    "count": 7,
+    "default_preview": "GCP fossilCO2 2025v15.pdf",
+    "enabled": true,
+    "entries": {
+      "GCB2025v15_MtCO2_flat.csv": {
+        "access": {
+          "hidden": false
+        },
+        "checksum": "md5:3008e30d913af5926a83d0d0775fb72e",
+        "ext": "csv",
+        "id": "bf31328a-1b5d-4778-9023-997a3aff4c5b",
+        "key": "GCB2025v15_MtCO2_flat.csv",
+        "links": {
+          "content": "https://zenodo.org/api/records/17417124/files/GCB2025v15_MtCO2_flat.csv/content",
+          "self": "https://zenodo.org/api/records/17417124/files/GCB2025v15_MtCO2_flat.csv"
+        },
+        "metadata": {},
+        "mimetype": "text/csv",
+        "size": 3147221,
+        "storage_class": "L"
+      },
+      "GCB2025v15_MtCO2_flat_metadata.json": {
+        "access": {
+          "hidden": false
+        },
+        "checksum": "md5:ee6955d4409ea110c546ae38660b5592",
+        "ext": "json",
+        "id": "a436b79c-5796-4a6d-88d4-91b787b8198a",
+        "key": "GCB2025v15_MtCO2_flat_metadata.json",
+        "links": {
+          "content": "https://zenodo.org/api/records/17417124/files/GCB2025v15_MtCO2_flat_metadata.json/content",
+          "self": "https://zenodo.org/api/records/17417124/files/GCB2025v15_MtCO2_flat_metadata.json"
+        },
+        "metadata": {},
+        "mimetype": "application/json",
+        "size": 3784,
+        "storage_class": "L"
+      },
+      "GCB2025v15_percapita_flat.csv": {
+        "access": {
+          "hidden": false
+        },
+        "checksum": "md5:946859158548b8b5dcc1f17a8b91363e",
+        "ext": "csv",
+        "id": "c8506961-2eab-48f5-a1a9-ef8d659a989b",
+        "key": "GCB2025v15_percapita_flat.csv",
+        "links": {
+          "content": "https://zenodo.org/api/records/17417124/files/GCB2025v15_percapita_flat.csv/content",
+          "self": "https://zenodo.org/api/records/17417124/files/GCB2025v15_percapita_flat.csv"
+        },
+        "metadata": {},
+        "mimetype": "text/csv",
+        "size": 2732085,
+        "storage_class": "L"
+      },
+      "GCB2025v15_percapita_flat_metadata.json": {
+        "access": {
+          "hidden": false
+        },
+        "checksum": "md5:5e2f91ae035ea14ac4317550c3ccbfa9",
+        "ext": "json",
+        "id": "8bea543a-2cee-4c9a-853b-9a807ea06e91",
+        "key": "GCB2025v15_percapita_flat_metadata.json",
+        "links": {
+          "content": "https://zenodo.org/api/records/17417124/files/GCB2025v15_percapita_flat_metadata.json/content",
+          "self": "https://zenodo.org/api/records/17417124/files/GCB2025v15_percapita_flat_metadata.json"
+        },
+        "metadata": {},
+        "mimetype": "application/json",
+        "size": 6730,
+        "storage_class": "L"
+      },
+      "GCB2025v15_population_flat.csv": {
+        "access": {
+          "hidden": false
+        },
+        "checksum": "md5:ca3796ef92541fb6b57b7309cfaf04f5",
+        "ext": "csv",
+        "id": "b1802e33-8bcb-4e27-8669-988218c905de",
+        "key": "GCB2025v15_population_flat.csv",
+        "links": {
+          "content": "https://zenodo.org/api/records/17417124/files/GCB2025v15_population_flat.csv/content",
+          "self": "https://zenodo.org/api/records/17417124/files/GCB2025v15_population_flat.csv"
+        },
+        "metadata": {},
+        "mimetype": "text/csv",
+        "size": 688959,
+        "storage_class": "L"
+      },
+      "GCB2025v15_sources_flat.csv": {
+        "access": {
+          "hidden": false
+        },
+        "checksum": "md5:bb4e63819ea7fbc33196981ab78567e6",
+        "ext": "csv",
+        "id": "a782b13a-b0dc-49c9-80f7-955b4619421b",
+        "key": "GCB2025v15_sources_flat.csv",
+        "links": {
+          "content": "https://zenodo.org/api/records/17417124/files/GCB2025v15_sources_flat.csv/content",
+          "self": "https://zenodo.org/api/records/17417124/files/GCB2025v15_sources_flat.csv"
+        },
+        "metadata": {},
+        "mimetype": "text/csv",
+        "size": 8299006,
+        "storage_class": "L"
+      },
+      "GCP fossilCO2 2025v15.pdf": {
+        "access": {
+          "hidden": false
+        },
+        "checksum": "md5:927586a5e33a0ba86782a5a2643da7ae",
+        "ext": "pdf",
+        "id": "b7eafe4c-6ea6-45ad-b70d-588dbcdfb1e0",
+        "key": "GCP fossilCO2 2025v15.pdf",
+        "links": {
+          "content": "https://zenodo.org/api/records/17417124/files/GCP%20fossilCO2%202025v15.pdf/content",
+          "iiif_api": "https://zenodo.org/api/iiif/record:17417124:GCP%20fossilCO2%202025v15.pdf/full/full/0/default.png",
+          "iiif_base": "https://zenodo.org/api/iiif/record:17417124:GCP%20fossilCO2%202025v15.pdf",
+          "iiif_canvas": "https://zenodo.org/api/iiif/record:17417124/canvas/GCP%20fossilCO2%202025v15.pdf",
+          "iiif_info": "https://zenodo.org/api/iiif/record:17417124:GCP%20fossilCO2%202025v15.pdf/info.json",
+          "self": "https://zenodo.org/api/records/17417124/files/GCP%20fossilCO2%202025v15.pdf"
+        },
+        "metadata": {
+          "height": 842,
+          "width": 595
+        },
+        "mimetype": "application/pdf",
+        "size": 893846,
+        "storage_class": "L"
+      }
+    },
+    "order": [],
+    "total_bytes": 15771631
+  },
+  "id": "17417124",
+  "is_draft": false,
+  "is_published": true,
+  "links": {
+    "access": "https://zenodo.org/api/records/17417124/access",
+    "access_grants": "https://zenodo.org/api/records/17417124/access/grants",
+    "access_links": "https://zenodo.org/api/records/17417124/access/links",
+    "access_request": "https://zenodo.org/api/records/17417124/access/request",
+    "access_users": "https://zenodo.org/api/records/17417124/access/users",
+    "archive": "https://zenodo.org/api/records/17417124/files-archive",
+    "archive_media": "https://zenodo.org/api/records/17417124/media-files-archive",
+    "communities": "https://zenodo.org/api/records/17417124/communities",
+    "communities-suggestions": "https://zenodo.org/api/records/17417124/communities-suggestions",
+    "doi": "https://doi.org/10.5281/zenodo.17417124",
+    "draft": "https://zenodo.org/api/records/17417124/draft",
+    "file_modification": "https://zenodo.org/api/records/17417124/file-modification",
+    "files": "https://zenodo.org/api/records/17417124/files",
+    "latest": "https://zenodo.org/api/records/17417124/versions/latest",
+    "latest_html": "https://zenodo.org/records/17417124/latest",
+    "media_files": "https://zenodo.org/api/records/17417124/media-files",
+    "parent": "https://zenodo.org/api/records/5569234",
+    "parent_doi": "https://doi.org/10.5281/zenodo.5569234",
+    "parent_doi_html": "https://zenodo.org/doi/10.5281/zenodo.5569234",
+    "parent_html": "https://zenodo.org/records/5569234",
+    "preview_html": "https://zenodo.org/records/17417124?preview=1",
+    "quota_increase": "https://zenodo.org/api/records/17417124/quota-increase",
+    "request_deletion": "https://zenodo.org/api/records/17417124/request-deletion",
+    "requests": "https://zenodo.org/api/records/17417124/requests",
+    "reserve_doi": "https://zenodo.org/api/records/17417124/draft/pids/doi",
+    "self": "https://zenodo.org/api/records/17417124",
+    "self_doi": "https://doi.org/10.5281/zenodo.17417124",
+    "self_doi_html": "https://zenodo.org/doi/10.5281/zenodo.17417124",
+    "self_html": "https://zenodo.org/records/17417124",
+    "self_iiif_manifest": "https://zenodo.org/api/iiif/record:17417124/manifest",
+    "self_iiif_sequence": "https://zenodo.org/api/iiif/record:17417124/sequence/default",
+    "thumbnails": {
+      "10": "https://zenodo.org/api/iiif/record:17417124:GCP%20fossilCO2%202025v15.pdf/full/%5E10,/0/default.jpg",
+      "100": "https://zenodo.org/api/iiif/record:17417124:GCP%20fossilCO2%202025v15.pdf/full/%5E100,/0/default.jpg",
+      "1200": "https://zenodo.org/api/iiif/record:17417124:GCP%20fossilCO2%202025v15.pdf/full/%5E1200,/0/default.jpg",
+      "250": "https://zenodo.org/api/iiif/record:17417124:GCP%20fossilCO2%202025v15.pdf/full/%5E250,/0/default.jpg",
+      "50": "https://zenodo.org/api/iiif/record:17417124:GCP%20fossilCO2%202025v15.pdf/full/%5E50,/0/default.jpg",
+      "750": "https://zenodo.org/api/iiif/record:17417124:GCP%20fossilCO2%202025v15.pdf/full/%5E750,/0/default.jpg"
+    },
+    "versions": "https://zenodo.org/api/records/17417124/versions"
+  },
+  "media_files": {
+    "count": 1,
+    "enabled": true,
+    "entries": {
+      "GCP fossilCO2 2025v15.pdf.ptif": {
+        "access": {
+          "hidden": true
+        },
+        "ext": "ptif",
+        "id": "4f5a4100-f11e-4500-be93-2d5f2ccc62b7",
+        "key": "GCP fossilCO2 2025v15.pdf.ptif",
+        "links": {
+          "content": "https://zenodo.org/api/records/17417124/files/GCP%20fossilCO2%202025v15.pdf.ptif/content",
+          "self": "https://zenodo.org/api/records/17417124/files/GCP%20fossilCO2%202025v15.pdf.ptif"
+        },
+        "metadata": null,
+        "mimetype": "application/octet-stream",
+        "processor": {
+          "source_file_id": "b7eafe4c-6ea6-45ad-b70d-588dbcdfb1e0",
+          "status": "finished",
+          "type": "image-tiles"
+        },
+        "size": 0,
+        "storage_class": "L"
+      }
+    },
+    "order": [],
+    "total_bytes": 0
+  },
+  "metadata": {
+    "creators": [
+      {
+        "affiliations": [
+          {
+            "name": "CICERO Center for International Climate Research"
+          }
+        ],
+        "person_or_org": {
+          "family_name": "Andrew",
+          "given_name": "Robbie M.",
+          "identifiers": [
+            {
+              "identifier": "0000-0001-8590-6431",
+              "scheme": "orcid"
+            }
+          ],
+          "name": "Andrew, Robbie M.",
+          "type": "personal"
+        }
+      },
+      {
+        "affiliations": [
+          {
+            "name": "CICERO Center for International Climate Research"
+          }
+        ],
+        "person_or_org": {
+          "family_name": "Peters",
+          "given_name": "Glen P.",
+          "identifiers": [
+            {
+              "identifier": "0000-0001-7889-8568",
+              "scheme": "orcid"
+            }
+          ],
+          "name": "Peters, Glen P.",
+          "type": "personal"
+        }
+      }
+    ],
+    "description": "<p>The <a href=\"https://www.globalcarbonproject.org/\">Global Carbon Project</a> (GCP) has been publishing estimates of global and national fossil CO2 emissions since 2001. In the first instance these were simple re-publications of data from another source, but over subsequent years refinements have been made in response to feedback and identification of inaccuracies. In this article (PDF document) we describe the history of this process leading up to the methodology used in the 2025 release of the GCP's fossil CO2 dataset.</p>\n<p>The fossil CO2 emissions dataset is included in both its standard, absolute form, and per capita, with associated metadata files in JSON format. A file indicating the source(s) of each data point is also provided.</p>\n<p>This is the initial release of the 2025 dataset.</p>",
+    "funding": [
+      {
+        "funder": {
+          "id": "023jta124",
+          "name": "Norwegian Environment Agency"
+        }
+      },
+      {
+        "award": {
+          "acronym": "VERIFY",
+          "id": "00k4n6c32::776810",
+          "identifiers": [
+            {
+              "identifier": "https://cordis.europa.eu/projects/776810",
+              "scheme": "url"
+            }
+          ],
+          "number": "776810",
+          "program": "H2020-EU.3.5.",
+          "title": {
+            "en": "Observation-based system for monitoring and verification of greenhouse gases"
+          }
+        },
+        "funder": {
+          "id": "00k4n6c32",
+          "name": "European Commission"
+        }
+      },
+      {
+        "award": {
+          "acronym": "4C",
+          "id": "00k4n6c32::821003",
+          "identifiers": [
+            {
+              "identifier": "https://cordis.europa.eu/projects/821003",
+              "scheme": "url"
+            }
+          ],
+          "number": "821003",
+          "program": "H2020-EU.3.5.",
+          "title": {
+            "en": "Climate-Carbon Interactions in the Current Century"
+          }
+        },
+        "funder": {
+          "id": "00k4n6c32",
+          "name": "European Commission"
+        }
+      },
+      {
+        "award": {
+          "acronym": "CoCO2",
+          "id": "00k4n6c32::958927",
+          "identifiers": [
+            {
+              "identifier": "https://cordis.europa.eu/projects/958927",
+              "scheme": "url"
+            }
+          ],
+          "number": "958927",
+          "program": "H2020-EU.2.1.6.",
+          "title": {
+            "en": "Prototype system for a Copernicus CO2 service"
+          }
+        },
+        "funder": {
+          "id": "00k4n6c32",
+          "name": "European Commission"
+        }
+      },
+      {
+        "award": {
+          "acronym": "EYE-CLIMA",
+          "id": "00k4n6c32::101081395",
+          "identifiers": [
+            {
+              "identifier": "https://cordis.europa.eu/projects/101081395",
+              "scheme": "url"
+            }
+          ],
+          "number": "101081395",
+          "program": "HORIZON.2.5",
+          "title": {
+            "en": "Verifying Emissions of Climate Forcers"
+          }
+        },
+        "funder": {
+          "id": "00k4n6c32",
+          "name": "European Commission"
+        }
+      }
+    ],
+    "languages": [
+      {
+        "id": "eng",
+        "title": {
+          "en": "English"
+        }
+      }
+    ],
+    "publication_date": "2025-10-22",
+    "publisher": "Zenodo",
+    "related_identifiers": [
+      {
+        "identifier": "10.5281/zenodo.831454",
+        "relation_type": {
+          "id": "cites",
+          "title": {
+            "de": "Zitiert",
+            "en": "Cites"
+          }
+        },
+        "resource_type": {
+          "id": "dataset",
+          "title": {
+            "de": "Datensatz",
+            "en": "Dataset"
+          }
+        },
+        "scheme": "doi"
+      },
+      {
+        "identifier": "10.5194/essd-12-1437-2020",
+        "relation_type": {
+          "id": "cites",
+          "title": {
+            "de": "Zitiert",
+            "en": "Cites"
+          }
+        },
+        "resource_type": {
+          "id": "publication-article",
+          "title": {
+            "de": "Zeitschriftenartikel",
+            "en": "Journal article"
+          }
+        },
+        "scheme": "doi"
+      }
+    ],
+    "resource_type": {
+      "id": "dataset",
+      "title": {
+        "de": "Datensatz",
+        "en": "Dataset"
+      }
+    },
+    "rights": [
+      {
+        "description": {
+          "en": "The Creative Commons Attribution license allows re-distribution and re-use of a licensed work on the condition that the creator is appropriately credited."
+        },
+        "icon": "cc-by-icon",
+        "id": "cc-by-4.0",
+        "props": {
+          "scheme": "spdx",
+          "url": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        "title": {
+          "en": "Creative Commons Attribution 4.0 International"
+        }
+      }
+    ],
+    "subjects": [
+      {
+        "subject": "Fossil CO2 emissions"
+      },
+      {
+        "subject": "Global Carbon Project"
+      },
+      {
+        "subject": "Carbon emissions"
+      },
+      {
+        "subject": "Carbon dioxide"
+      }
+    ],
+    "title": "The Global Carbon Project's fossil CO2 emissions dataset",
+    "version": "2025v15"
+  },
+  "parent": {
+    "access": {
+      "owned_by": {
+        "user": "33716"
+      },
+      "settings": {
+        "accept_conditions_text": null,
+        "allow_guest_requests": false,
+        "allow_user_requests": false,
+        "secret_link_expiration": 0
+      }
+    },
+    "communities": {
+      "entries": [
+        {
+          "access": {
+            "member_policy": "open",
+            "members_visibility": "restricted",
+            "record_submission_policy": "open",
+            "review_policy": "closed",
+            "visibility": "public"
+          },
+          "children": {
+            "allow": true
+          },
+          "created": "2022-11-23T15:53:29.436323+00:00",
+          "custom_fields": {},
+          "deletion_status": {
+            "is_deleted": false,
+            "status": "P"
+          },
+          "id": "f0a8b890-f97a-4eb2-9eac-8b8a712d3a6c",
+          "links": {},
+          "metadata": {
+            "curation_policy": "<h2>Curation policy</h2>\n<p>The EU Open Research Repository serves as a repository for research outputs (data, software, posters, presentations, publications, etc) which have been funded under an EU research funding programme such as Horizon Europe, Euratom or earlier Framework Programmes.</p>\n<p>The community is managed by CERN on behalf of the European Commission.&nbsp;</p>\n<p><a href=\"https://about.zenodo.org/policies/\">Zenodo&rsquo;s general policies</a> and <a href=\"https://about.zenodo.org/terms/\">Terms of Use</a> apply to all content.</p>\n<h3>Scope</h3>\n<p>The EU Open Research Repository accepts all digital research objects which is a research output stemming from one of EU&rsquo;s research and innovation funding programmes. The funding programmes currently include:</p>\n<ul>\n<li>\n<p>Horizon Europe (including ERC, MSCA), earlier Framework Programmes (eg Horizon 2020) as well as Euratom.</p>\n</li>\n</ul>\n<p>In line with the principle as open as possible, as closed as necessary both public and restricted content is accepted. See note on how <a href=\"https://about.zenodo.org/infrastructure/\">Zenodo handles restricted content</a>.</p>\n<h3>Content submission</h3>\n<p>EU programme beneficiaries are eligible to submit content to the community. The community supports three types of content submissions:</p>\n<ul>\n<li>\n<p>Submission via an EU Project Community (through user interface or programmatic APIs).</p>\n</li>\n<li>\n<p>Submission directly to the EU Open Research Repository.</p>\n</li>\n<li>\n<p>Automated harvesting from existing Zenodo content.</p>\n</li>\n</ul>\n<h4>Project community (preferred)</h4>\n<p>A representative of an EU project may request an EU Project Community and invite other project participants as members of the community. The project community is linked to one or more European Commission grants. All records in the project community are automatically integrated into the EU Open Research Repository immediately upon acceptance into the project community.&nbsp;</p>\n<h4>Direct submission</h4>\n<p>Any user may submit a record directly to the EU Open Research Repository. The submission will be moderated by Zenodo staff for compliance with the minimal required metadata requirements and its correctness.</p>\n<h4>Automated harvesting</h4>\n<p>Records found among Zenodo&rsquo;s existing content will on a regular basis automatically be integrated if they are found to comply with the requirements. The submissions through this method are integrated into the EU Open Research Repository with delay in a fully automated way.</p>\n<h3>Descriptive information</h3>\n<h4>Minimal metadata requirements</h4>\n<p>Records in the EU Open Research Repository are required to comply with the following minimal metadata requirements:</p>\n<ul>\n<li>\n<p>Visibility: Both public and restricted (with or without embargo and/or access request)</p>\n</li>\n<li>\n<p>Resource types: All resource types.</p>\n</li>\n<li>\n<p>Licenses: Public and embargoed records MUST specify a license. The chosen license SHOULD be compliant with the Horizon Europe open science requirements (see <a href=\"/communities/eu/pages/open-science\">Open Science in Horizon Europe</a>)</p>\n</li>\n<li>\n<p>Funding information: Records MUST specify at least one grant from the European Commission.</p>\n</li>\n<li>Journal articles: Records MUST specify at the publishing venue (e.g. the journal the article was published in).</li>\n<li>\n<p>Creators: Creators SHOULD be identified with a persistent identifier (e.g. ORCID, GND, &hellip;), and affiliations SHOULD be identified with a persistent identifier (e.g. ROR, ISNI, &hellip;)</p>\n</li>\n<li>\n<p>Subjects: Records SHOULD specify one or more fields of science from the <a href=\"https://op.europa.eu/en/web/eu-vocabularies/euroscivoc\">European Science Vocabulary</a>.</p>\n</li>\n</ul>\n<p>These metadata requirements comes from the related open science requirements in Horizon Europe which are detailed in each project's grant agreement.</p>\n<h3>Review &amp; moderation</h3>\n<p>All submissions undergo automated curation checks for compliance with the policy. Submissions through project communities are in addition reviewed by the project community. Submission directly to the EU Open Research Repository is in addiotn reviewed by Zenodo staff.</p>\n<p>Community curators may at any point edit metadata of the records in the community without notice through human or automated processing. The curators may at their sole discretion remove records from the community that are deemed not to comply with the content and curation policy or which are deemed of insufficient quality.</p>\n<h3>Updates</h3>\n<p>The content and curation policy is subject to change by the community owner at any time and without notice, other than through updating this page.</p>",
+            "description": "Open repository for EU-funded research outputs from Horizon Europe, Euratom, and earlier Framework Programmes.",
+            "funding": [
+              {
+                "funder": {
+                  "id": "00k4n6c32"
+                }
+              }
+            ],
+            "organizations": [
+              {
+                "id": "00k4n6c32"
+              }
+            ],
+            "page": "<h2>About</h2>\n<p>The EU Open Research Repository is a Zenodo-community dedicated to fostering open science and enhancing the visibility and accessibility of research outputs funded by the European Union. The community is managed by CERN on behalf of the European Commission.</p>\n<h3>Mission</h3>\n<p>The mission of the repository is to support the implementation of the EU's open science policy, providing a trusted and comprehensive space for researchers to share their research outputs such as data, software, reports, presentations, posters and more. The EU Open Research Repository simplifies the process of complying with open science requirements, ensuring that research outputs from Horizon Europe, Euratom, and earlier Framework Programmes are freely accessible, thereby accelerating scientific discovery and innovation.</p>\n<h3>EU Open Research Repository vs Open Research Europe (ORE)</h3>\n<p>The EU Open Research Repository serves as a complementary platform to the <a href=\"https://open-research-europe.ec.europa.eu/\">Open Research Europe</a> (ORE) publishing platform. Open Research Europe focuses on providing a publishing venue for peer-reviewed articles, ensuring that research meets rigorous academic standards. The EU Open Research Repository provides a space for all the other research outputs including data sets, software, posters, and presentations that are out of scope for ORE. This holistic approach enables researchers to not only publish their findings but also share the underlying data and materials that support their work, fostering transparency and reproducibility in the scientific process.&nbsp;</p>\n<h3>Funding</h3>\n<p>The EU Open Research Repository is funded by the European Union under grant agreement no. <a href=\"https://cordis.europa.eu/project/id/101256740\">101256740</a>&nbsp; (HORIZON-ZEN Plus). For more information about the project see <a href=\"https://about.zenodo.org/projects/horizon-zen-plus/\">https://about.zenodo.org/projects/horizon-zen/.</a></p>",
+            "title": "EU Open Research Repository",
+            "type": {
+              "id": "organization"
+            },
+            "website": "https://research-and-innovation.ec.europa.eu"
+          },
+          "revision_id": 24,
+          "slug": "eu",
+          "theme": {
+            "brand": "horizon",
+            "enabled": true,
+            "style": {
+              "font": {
+                "family": "Arial, sans-serif",
+                "size": "16px",
+                "weight": 600
+              },
+              "mainHeaderBackgroundColor": "#FFFFFF",
+              "primaryColor": "#004494",
+              "primaryTextColor": "#FFFFFF",
+              "secondaryColor": "#FFD617",
+              "secondaryTextColor": "#000000",
+              "tertiaryColor": "#e3eefd",
+              "tertiaryTextColor": "#1c5694"
+            }
+          },
+          "updated": "2026-03-31T12:29:43.596724+00:00"
+        }
+      ],
+      "ids": [
+        "f0a8b890-f97a-4eb2-9eac-8b8a712d3a6c"
+      ]
+    },
+    "id": "5569234",
+    "pids": {
+      "doi": {
+        "client": "datacite",
+        "identifier": "10.5281/zenodo.5569234",
+        "provider": "datacite"
+      }
+    }
+  },
+  "pids": {
+    "doi": {
+      "client": "datacite",
+      "identifier": "10.5281/zenodo.17417124",
+      "provider": "datacite"
+    },
+    "oai": {
+      "identifier": "oai:zenodo.org:17417124",
+      "provider": "oai"
+    }
+  },
+  "revision_id": 6,
+  "stats": {
+    "all_versions": {
+      "data_volume": 252297768379.0,
+      "downloads": 117598,
+      "unique_downloads": 80777,
+      "unique_views": 70317,
+      "views": 78675
+    },
+    "this_version": {
+      "data_volume": 10968126789.0,
+      "downloads": 6173,
+      "unique_downloads": 5367,
+      "unique_views": 4859,
+      "views": 5351
+    }
+  },
+  "status": "published",
+  "swh": {},
+  "updated": "2025-11-04T08:05:05.004309+00:00",
+  "versions": {
+    "index": 8,
+    "is_latest": true
+  }
+}
